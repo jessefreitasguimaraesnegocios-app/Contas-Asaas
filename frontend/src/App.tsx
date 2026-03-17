@@ -122,7 +122,7 @@ export default function App() {
           name: form.name,
           email: form.email,
           loginEmail: form.loginEmail || form.email,
-          cpfCnpj: form.cpfCnpj.replace(/\D/g, ''),
+          cpfCnpj: form.cpfCnpj,
           birthDate: form.birthDate,
           companyType: form.companyType,
           phone: form.phone ? onlyDigits(form.phone) || null : null,
@@ -131,7 +131,7 @@ export default function App() {
           addressNumber: form.addressNumber,
           complement: form.complement || null,
           province: form.province,
-          postalCode: form.postalCode.replace(/\D/g, ''),
+          postalCode: form.postalCode,
           incomeValue: form.incomeValue,
         }),
       });
