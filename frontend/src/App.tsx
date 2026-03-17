@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { Session } from '@supabase/supabase-js';
-import { supabase, getEdgeFunctionUrl } from './lib/supabase';
+import { supabase } from './lib/supabase';
 import {
   maskCpfCnpj,
   maskPhone,
@@ -106,37 +106,27 @@ export default function App() {
     setCreating(true);
     setMessage(null);
     try {
-      const url = getEdgeFunctionUrl('create-subaccount');
-      const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-      const token = session?.access_token ?? anonKey;
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-          apikey: anonKey,
-        },
-        body: JSON.stringify({
-          app_id: form.app_id,
-          environment: form.environment,
-          name: form.name,
-          email: form.email,
-          loginEmail: form.loginEmail || form.email,
-          cpfCnpj: form.cpfCnpj,
-          birthDate: form.birthDate,
-          companyType: form.companyType,
-          phone: form.phone ? onlyDigits(form.phone) || null : null,
-          mobilePhone: form.mobilePhone ? onlyDigits(form.mobilePhone) || null : null,
-          address: form.address,
-          addressNumber: form.addressNumber,
-          complement: form.complement || null,
-          province: form.province,
-          postalCode: form.postalCode,
-          incomeValue: form.incomeValue,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || data.details?.description || 'Erro ao criar subconta');
+      const body = {
+        app_id: form.app_id,
+        environment: form.environment,
+        name: form.name,
+        email: form.email,
+        loginEmail: form.loginEmail || form.email,
+        cpfCnpj: form.cpfCnpj,
+        birthDate: form.birthDate,
+        companyType: form.companyType,
+        phone: form.phone ? onlyDigits(form.phone) || null : null,
+        mobilePhone: form.mobilePhone ? onlyDigits(form.mobilePhone) || null : null,
+        address: form.address,
+        addressNumber: form.addressNumber,
+        complement: form.complement || null,
+        province: form.province,
+        postalCode: form.postalCode,
+        incomeValue: form.incomeValue,
+      };
+      const { data, error } = await supabase.functions.invoke('create-subaccount', { body });
+      if (error) throw new Error(error.message);
+      if (data?.error) throw new Error(data.error || data.details?.description || 'Erro ao criar subconta');
       setMessage({ type: 'ok', text: 'Subconta criada e salva com sucesso.' });
       setForm({ ...form, name: '', email: '', loginEmail: '', cpfCnpj: '', birthDate: '' });
       await loadSubaccounts();
