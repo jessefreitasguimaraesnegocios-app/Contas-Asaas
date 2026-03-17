@@ -1,0 +1,20 @@
+# env (nunca commitar)
+.env
+.env.local
+.env.*.local
+
+# dependências e build
+node_modules/
+frontend/dist/
+frontend/.vite/
+
+# Supabase
+supabase/.temp/
+supabase/.branches/
+
+# IDE / OS
+.idea/
+.vscode/
+*.log
+.DS_Store
+Thumbs.db
