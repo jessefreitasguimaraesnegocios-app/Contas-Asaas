@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import type { Session } from '@supabase/supabase-js';
 import { supabase, getEdgeFunctionUrl } from './lib/supabase';
 import {
   maskCpfCnpj,
@@ -26,6 +27,8 @@ type Subaccount = {
 };
 
 export default function App() {
+  const [session, setSession] = useState<Session | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
   const [tab, setTab] = useState<'list' | 'create' | 'apps'>('list');
   const [apps, setApps] = useState<App[]>([]);
   const [subaccounts, setSubaccounts] = useState<Subaccount[]>([]);
@@ -33,6 +36,10 @@ export default function App() {
   const [creating, setCreating] = useState(false);
   const [message, setMessage] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
   const [loadingCep, setLoadingCep] = useState(false);
+  const [loginEmail, setLoginEmail] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+  const [loginLoading, setLoginLoading] = useState(false);
+  const [signUpMode, setSignUpMode] = useState(false);
 
   const [form, setForm] = useState({
     app_id: '',
@@ -67,13 +74,28 @@ export default function App() {
   }
 
   useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session: s } }) => {
+      setSession(s);
+      setAuthLoading(false);
+    });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, s) => {
+      setSession(s);
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    if (!session) {
+      setLoading(false);
+      return;
+    }
     (async () => {
       setLoading(true);
       await loadApps();
       await loadSubaccounts();
       setLoading(false);
     })();
-  }, []);
+  }, [session]);
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
@@ -85,13 +107,14 @@ export default function App() {
     setMessage(null);
     try {
       const url = getEdgeFunctionUrl('create-subaccount');
-      const key = import.meta.env.VITE_SUPABASE_ANON_KEY;
+      const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+      const token = session?.access_token ?? anonKey;
       const res = await fetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${key}`,
-          apikey: key,
+          Authorization: `Bearer ${token}`,
+          apikey: anonKey,
         },
         body: JSON.stringify({
           app_id: form.app_id,
@@ -153,6 +176,94 @@ export default function App() {
     setTimeout(() => setMessage(null), 1500);
   }
 
+  async function handleLogin(e: React.FormEvent) {
+    e.preventDefault();
+    if (!loginEmail.trim() || !loginPassword) {
+      setMessage({ type: 'err', text: 'E-mail e senha são obrigatórios.' });
+      return;
+    }
+    setLoginLoading(true);
+    setMessage(null);
+    try {
+      if (signUpMode) {
+        const { error } = await supabase.auth.signUp({ email: loginEmail.trim(), password: loginPassword });
+        if (error) throw error;
+        setMessage({ type: 'ok', text: 'Conta criada. Confirme o e-mail se necessário, ou faça login.' });
+      } else {
+        const { error } = await supabase.auth.signInWithPassword({ email: loginEmail.trim(), password: loginPassword });
+        if (error) throw error;
+      }
+    } catch (err) {
+      setMessage({ type: 'err', text: err instanceof Error ? err.message : 'Erro ao entrar.' });
+    } finally {
+      setLoginLoading(false);
+    }
+  }
+
+  async function handleLogout() {
+    await supabase.auth.signOut();
+  }
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-surface-500">Carregando…</div>
+      </div>
+    );
+  }
+
+  if (!session) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-surface-50 p-4">
+        <div className="card p-6 w-full max-w-md">
+          <h1 className="text-xl font-bold text-surface-900 mb-2">Plataforma Subcontas Asaas</h1>
+          <p className="text-surface-600 text-sm mb-6">Entre para criar e gerenciar subcontas.</p>
+          {message && (
+            <div
+              className={`mb-4 px-4 py-3 rounded-lg text-sm ${message.type === 'ok' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}
+            >
+              {message.text}
+            </div>
+          )}
+          <form onSubmit={handleLogin} className="space-y-4">
+            <div>
+              <label className="label">E-mail</label>
+              <input
+                type="email"
+                className="input"
+                value={loginEmail}
+                onChange={(e) => setLoginEmail(e.target.value)}
+                placeholder="seu@email.com"
+                autoComplete="email"
+              />
+            </div>
+            <div>
+              <label className="label">Senha</label>
+              <input
+                type="password"
+                className="input"
+                value={loginPassword}
+                onChange={(e) => setLoginPassword(e.target.value)}
+                placeholder="••••••••"
+                autoComplete={signUpMode ? 'new-password' : 'current-password'}
+              />
+            </div>
+            <button type="submit" className="btn-primary w-full" disabled={loginLoading}>
+              {loginLoading ? 'Aguarde…' : signUpMode ? 'Criar conta' : 'Entrar'}
+            </button>
+            <button
+              type="button"
+              className="text-sm text-brand-600 hover:underline"
+              onClick={() => { setSignUpMode(!signUpMode); setMessage(null); }}
+            >
+              {signUpMode ? 'Já tenho conta, entrar' : 'Criar conta'}
+            </button>
+          </form>
+        </div>
+      </div>
+    );
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -166,6 +277,15 @@ export default function App() {
       <header className="bg-surface-900 text-white px-6 py-4 shadow">
         <div className="max-w-6xl mx-auto flex items-center justify-between">
           <h1 className="text-xl font-bold font-sans">Plataforma Subcontas Asaas</h1>
+          <div className="flex items-center gap-4">
+          <span className="text-surface-300 text-sm">{session.user?.email}</span>
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="px-3 py-1.5 rounded-lg border border-surface-600 text-sm hover:bg-surface-800"
+          >
+            Sair
+          </button>
           <nav className="flex gap-4">
             <button
               type="button"
@@ -189,6 +309,7 @@ export default function App() {
               Apps
             </button>
           </nav>
+          </div>
         </div>
       </header>
 
