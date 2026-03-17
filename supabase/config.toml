@@ -1,0 +1,19 @@
+# Supabase local config (usado pelo CLI)
+# Para link/push use: npx supabase link --project-ref hytuyyvjaukdwmdxtdmi
+
+# Permite chamar create-subaccount com chave anon (evita 401 no gateway)
+[functions.create-subaccount]
+verify_jwt = false
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public"]
+
+[db]
+port = 54322
+
+[studio]
+enabled = true
+port = 54323
+
