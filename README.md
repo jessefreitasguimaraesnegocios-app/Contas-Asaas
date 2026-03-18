@@ -21,9 +21,12 @@ Sistema para criar e gerenciar subcontas Asaas (sandbox e produção), vinculada
 1. Instale o [Supabase CLI](https://supabase.com/docs/guides/cli) e faça login.
 2. Na pasta do projeto: `supabase link` (vincule ao projeto).
 3. Configure os secrets da função (token da **conta principal** Asaas para cada ambiente):
+   - O valor deve ser **exatamente** o mesmo do `access_token` do script que já funciona (ex.: `criar-subconta-sandbox.js`). Copie o valor completo, incluindo `$` no início se existir.
+   - No Dashboard: Project Settings → Edge Functions → Secrets.
+   - Ou via CLI:
    ```bash
-   supabase secrets set ASAAS_MAIN_TOKEN_SANDBOX="$aact_hmlg_..."
-   supabase secrets set ASAAS_MAIN_TOKEN_PRODUCTION="$aact_prod_..."
+   supabase secrets set ASAAS_MAIN_TOKEN_SANDBOX="COLE_AQUI_O_MESMO_VALOR_DO_SCRIPT"
+   supabase secrets set ASAAS_MAIN_TOKEN_PRODUCTION="..."
    ```
 4. Deploy da função:
    ```bash
@@ -45,6 +48,18 @@ Sistema para criar e gerenciar subcontas Asaas (sandbox e produção), vinculada
    npm run dev
    ```
 3. Acesse `http://localhost:5174`.
+
+## Por que o script funciona e o app não?
+
+O **script** (ex.: `criar-subconta-sandbox.js`) chama **direto** a API Asaas: `POST https://api-sandbox.asaas.com/v3/accounts` com o header `access_token`. Não passa pelo Supabase.
+
+O **app** faz: **navegador** → **Supabase Edge Function** (gateway) → **create-subaccount** → **Asaas API**. Se der 401/403, o erro é do **gateway do Supabase** (JWT/apikey), não da Asaas. Confira:
+
+1. **Vercel:** variáveis `VITE_SUPABASE_URL` e `VITE_SUPABASE_ANON_KEY` definidas e **Redeploy** depois de salvar.
+2. **Supabase → Edge Functions → create-subaccount → Details:** "Verify JWT with legacy secret" em **OFF** para evitar 401 por chave legacy.
+3. **Supabase → Edge Functions → Secrets:** `ASAAS_MAIN_TOKEN_SANDBOX` com o **mesmo** valor do `access_token` do script (copie do script e cole no secret).
+
+Quando a requisição chega na função, ela chama a Asaas **igual ao script** (mesmo URL, mesmo header `access_token`, mesmo body).
 
 ## Uso
 

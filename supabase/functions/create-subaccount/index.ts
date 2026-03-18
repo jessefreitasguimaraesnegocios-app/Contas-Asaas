@@ -1,4 +1,8 @@
 // @ts-nocheck
+// Esta função replica o que o script criar-subconta-sandbox.js faz:
+// POST para https://api-sandbox.asaas.com/v3/accounts (ou produção) com header access_token.
+// O token vem do secret ASAAS_MAIN_TOKEN_SANDBOX/PRODUCTION — deve ser o MESMO valor
+// do access_token do script que já funciona (copie incluindo o $ no início se tiver).
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
