@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { Session } from '@supabase/supabase-js';
-import { supabase } from './lib/supabase';
+import { supabase, getEdgeFunctionUrl } from './lib/supabase';
 import {
   maskCpfCnpj,
   maskPhone,
@@ -124,8 +124,23 @@ export default function App() {
         postalCode: form.postalCode,
         incomeValue: form.incomeValue,
       };
-      const { data, error } = await supabase.functions.invoke('create-subaccount', { body });
-      if (error) throw new Error(error.message);
+      const url = getEdgeFunctionUrl('create-subaccount');
+      const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY ?? '';
+      const token = session?.access_token ?? anonKey;
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+          apikey: anonKey,
+        },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        const msg = data?.error || data?.message || data?.details?.description || `Erro ${res.status}`;
+        throw new Error(msg);
+      }
       if (data?.error) throw new Error(data.error || data.details?.description || 'Erro ao criar subconta');
       setMessage({ type: 'ok', text: 'Subconta criada e salva com sucesso.' });
       setForm({ ...form, name: '', email: '', loginEmail: '', cpfCnpj: '', birthDate: '' });
