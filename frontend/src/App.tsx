@@ -104,7 +104,18 @@ export default function App() {
       setAsaasOffset(nextOffset + (result?.limit ?? list.length ?? 0));
       setAsaasSubaccounts((prev) => (reset ? list : [...prev, ...list]));
     } catch (err) {
-      setMessage({ type: 'err', text: err instanceof Error ? err.message : 'Erro ao listar subcontas do Asaas.' });
+      const anyErr = err as any;
+      const baseMsg = err instanceof Error ? err.message : 'Erro ao listar subcontas do Asaas.';
+      const status = anyErr?.status ? ` (status ${anyErr.status})` : '';
+      const ctx = anyErr?.context;
+      const ctxBody =
+        ctx?.body && typeof ctx.body === 'string'
+          ? ctx.body
+          : ctx?.body
+            ? JSON.stringify(ctx.body)
+            : '';
+      const details = ctxBody ? `\n\nDetalhes: ${ctxBody}` : '';
+      setMessage({ type: 'err', text: `${baseMsg}${status}${details}` });
     } finally {
       setAsaasLoading(false);
     }
