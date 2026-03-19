@@ -145,6 +145,15 @@ export default function App() {
     })();
   }, [session]);
 
+  // Garante que ao entrar na aba "Subcontas" a lista esteja sempre atualizada
+  useEffect(() => {
+    if (!session) return;
+    if (tab !== 'list') return;
+    // Carrega sem bloquear a tela inteira; evita estado "criou e não apareceu".
+    void loadSubaccounts();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab, session]);
+
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
     if (!form.app_id) {
@@ -199,6 +208,7 @@ export default function App() {
       setMessage({ type: 'ok', text: 'Subconta criada e salva com sucesso.' });
       setForm({ ...form, name: '', email: '', loginEmail: '', cpfCnpj: '', birthDate: '' });
       await loadSubaccounts();
+      setTab('list');
     } catch (err) {
       setMessage({ type: 'err', text: err instanceof Error ? err.message : 'Erro ao criar.' });
     } finally {
