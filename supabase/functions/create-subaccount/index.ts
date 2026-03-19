@@ -103,9 +103,14 @@ serve(async (req) => {
       postal_code: payload.postalCode,
       city_name: payload.cityName,
       state: payload.state,
+      // split + mensalidade (opcao B: por subconta)
+      split_percent: payload.splitPercent ?? 0,
+      monthly_fee_cents: payload.monthlyFeeCents ?? 0,
       raw_creation_response: createData,
       raw_key_response: keyData,
-    }).select("id, asaas_subaccount_id, asaas_wallet_id, api_key, email, name, created_at").single();
+    }).select(
+      "id, asaas_subaccount_id, asaas_wallet_id, api_key, email, name, split_percent, monthly_fee_cents, created_at"
+    ).single();
 
     if (error) {
       return new Response(

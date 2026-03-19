@@ -22,6 +22,8 @@ type Subaccount = {
   name: string | null;
   cpf_cnpj: string | null;
   status: string | null;
+  split_percent: number | string | null;
+  monthly_fee_cents: number | string | null;
   created_at: string;
   apps?: { code: string; name: string } | null;
 };
@@ -58,6 +60,8 @@ export default function App() {
     province: '',
     postalCode: '',
     incomeValue: 25000,
+    splitPercent: 10,
+    monthlyFee: 50,
   });
 
   async function loadApps() {
@@ -68,7 +72,9 @@ export default function App() {
   async function loadSubaccounts() {
     const { data } = await supabase
       .from('asaas_subaccounts')
-      .select('id, app_id, environment, asaas_subaccount_id, asaas_wallet_id, api_key, email, name, cpf_cnpj, status, created_at, apps(code, name)')
+      .select(
+        'id, app_id, environment, asaas_subaccount_id, asaas_wallet_id, api_key, email, name, cpf_cnpj, status, split_percent, monthly_fee_cents, created_at, apps(code, name)'
+      )
       .order('created_at', { ascending: false });
     setSubaccounts(((data ?? []) as unknown) as Subaccount[]);
   }
@@ -123,6 +129,8 @@ export default function App() {
         province: form.province,
         postalCode: form.postalCode,
         incomeValue: form.incomeValue,
+        splitPercent: form.splitPercent,
+        monthlyFeeCents: Math.round(Number(form.monthlyFee) * 100),
       };
 
       const { data: fnData, error: fnError } = await supabase.functions.invoke('create-subaccount', {
@@ -159,6 +167,21 @@ export default function App() {
   function maskKey(key: string) {
     if (!key || key.length < 12) return '••••••••';
     return key.slice(0, 12) + '…' + key.slice(-6);
+  }
+
+  const brl = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
+  function formatMoneyCents(value: string | number | null | undefined) {
+    const cents =
+      value == null
+        ? 0
+        : typeof value === 'string'
+          ? parseInt(value, 10) || 0
+          : Number(value) || 0;
+    return brl.format(cents / 100);
+  }
+  function formatSplitPercent(value: string | number | null | undefined) {
+    const p = value == null ? 0 : typeof value === 'string' ? parseFloat(value) || 0 : Number(value) || 0;
+    return `${p}%`;
   }
 
   async function handleDeleteSubaccount(id: string) {
@@ -532,6 +555,29 @@ export default function App() {
                 <label className="label">Renda/Faturamento mensal</label>
                 <input type="number" className="input" value={form.incomeValue} onChange={(e) => setForm({ ...form, incomeValue: Number(e.target.value) })} />
               </div>
+              <div>
+                <label className="label">Split (% que você ganha)</label>
+                <input
+                  type="number"
+                  className="input"
+                  value={form.splitPercent}
+                  min={0}
+                  max={100}
+                  step={0.1}
+                  onChange={(e) => setForm({ ...form, splitPercent: Number(e.target.value) })}
+                />
+              </div>
+              <div>
+                <label className="label">Mensalidade (R$)</label>
+                <input
+                  type="number"
+                  className="input"
+                  value={form.monthlyFee}
+                  min={0}
+                  step={0.01}
+                  onChange={(e) => setForm({ ...form, monthlyFee: Number(e.target.value) })}
+                />
+              </div>
               <div className="md:col-span-2 flex justify-end pt-4">
                 <button type="submit" className="btn-primary" disabled={creating}>
                   {creating ? 'Criando…' : 'Criar subconta'}
@@ -556,6 +602,8 @@ export default function App() {
                     <th className="text-left px-4 py-3 font-medium">Nome / E-mail</th>
                     <th className="text-left px-4 py-3 font-medium">ID Subconta</th>
                     <th className="text-left px-4 py-3 font-medium">Chave API</th>
+                    <th className="text-left px-4 py-3 font-medium">Split</th>
+                    <th className="text-left px-4 py-3 font-medium">Mensalidade</th>
                     <th className="text-left px-4 py-3 font-medium">Ações</th>
                     <th className="text-left px-4 py-3 font-medium">Criado em</th>
                   </tr>
@@ -563,7 +611,7 @@ export default function App() {
                 <tbody>
                   {subaccounts.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="px-4 py-8 text-center text-surface-500">
+                      <td colSpan={9} className="px-4 py-8 text-center text-surface-500">
                         Nenhuma subconta ainda. Crie uma em &quot;Nova subconta&quot;.
                       </td>
                     </tr>
@@ -602,6 +650,8 @@ export default function App() {
                             {maskKey(s.api_key)}
                           </button>
                         </td>
+                        <td className="px-4 py-3 text-surface-700 text-xs">{formatSplitPercent(s.split_percent)}</td>
+                        <td className="px-4 py-3 text-surface-700 text-xs">{formatMoneyCents(s.monthly_fee_cents)}</td>
                         <td className="px-4 py-3">
                           <button
                             type="button"
