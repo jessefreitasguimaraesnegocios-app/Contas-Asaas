@@ -8,6 +8,9 @@ verify_jwt = false
 [functions.delete-subaccount]
 verify_jwt = false
 
+[functions.list-asaas-subaccounts]
+verify_jwt = false
+
 [api]
 enabled = true
 port = 54321

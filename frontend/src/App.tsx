@@ -33,9 +33,14 @@ type Subaccount = {
 export default function App() {
   const [session, setSession] = useState<Session | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
-  const [tab, setTab] = useState<'list' | 'create' | 'apps'>('list');
+  const [tab, setTab] = useState<'list' | 'asaas' | 'create' | 'apps'>('list');
   const [apps, setApps] = useState<App[]>([]);
   const [subaccounts, setSubaccounts] = useState<Subaccount[]>([]);
+  const [asaasLoading, setAsaasLoading] = useState(false);
+  const [asaasEnvironment, setAsaasEnvironment] = useState<'sandbox' | 'production'>('sandbox');
+  const [asaasOffset, setAsaasOffset] = useState(0);
+  const [asaasHasMore, setAsaasHasMore] = useState(false);
+  const [asaasSubaccounts, setAsaasSubaccounts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [message, setMessage] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
@@ -79,6 +84,29 @@ export default function App() {
       )
       .order('created_at', { ascending: false });
     setSubaccounts(((data ?? []) as unknown) as Subaccount[]);
+  }
+
+  async function loadAsaasSubaccounts(opts?: { reset?: boolean }) {
+    const reset = opts?.reset ?? false;
+    const nextOffset = reset ? 0 : asaasOffset;
+    setAsaasLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('list-asaas-subaccounts', {
+        body: { environment: asaasEnvironment, offset: nextOffset, limit: 50 },
+        headers: { 'x-client-info': 'plataforma-subcontas' },
+      });
+      if (error) throw error;
+      const result = (data as any)?.result;
+      const list = Array.isArray(result?.data) ? result.data : [];
+      const hasMore = Boolean(result?.hasMore);
+      setAsaasHasMore(hasMore);
+      setAsaasOffset(nextOffset + (result?.limit ?? list.length ?? 0));
+      setAsaasSubaccounts((prev) => (reset ? list : [...prev, ...list]));
+    } catch (err) {
+      setMessage({ type: 'err', text: err instanceof Error ? err.message : 'Erro ao listar subcontas do Asaas.' });
+    } finally {
+      setAsaasLoading(false);
+    }
   }
 
   useEffect(() => {
@@ -357,6 +385,19 @@ export default function App() {
               className={`px-3 py-1.5 rounded-lg transition ${tab === 'list' ? 'bg-brand-500 text-white' : 'hover:bg-surface-800'}`}
             >
               Subcontas
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setTab('asaas');
+                setMessage(null);
+                setAsaasSubaccounts([]);
+                setAsaasOffset(0);
+                void loadAsaasSubaccounts({ reset: true });
+              }}
+              className={`px-3 py-1.5 rounded-lg transition ${tab === 'asaas' ? 'bg-brand-500 text-white' : 'hover:bg-surface-800'}`}
+            >
+              Asaas (todas)
             </button>
             <button
               type="button"
@@ -680,6 +721,91 @@ export default function App() {
                   )}
                 </tbody>
               </table>
+            </div>
+          </div>
+        )}
+
+        {tab === 'asaas' && (
+          <div className="card overflow-hidden">
+            <div className="px-6 py-4 border-b border-surface-200 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-semibold">Subcontas no Asaas (todas)</h2>
+                <p className="text-sm text-surface-500">Lista direta do Asaas via API (não depende do Supabase).</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <label className="text-sm text-surface-600">Ambiente</label>
+                <select
+                  className="input !py-2"
+                  value={asaasEnvironment}
+                  onChange={(e) => {
+                    const env = e.target.value as 'sandbox' | 'production';
+                    setAsaasEnvironment(env);
+                    setAsaasSubaccounts([]);
+                    setAsaasOffset(0);
+                    setAsaasHasMore(false);
+                    void loadAsaasSubaccounts({ reset: true });
+                  }}
+                >
+                  <option value="sandbox">Sandbox</option>
+                  <option value="production">Produção</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-surface-50 border-b border-surface-200">
+                    <th className="text-left px-4 py-3 font-medium">Nome</th>
+                    <th className="text-left px-4 py-3 font-medium">E-mail</th>
+                    <th className="text-left px-4 py-3 font-medium">CPF/CNPJ</th>
+                    <th className="text-left px-4 py-3 font-medium">Wallet</th>
+                    <th className="text-left px-4 py-3 font-medium">ID</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {asaasSubaccounts.length === 0 && !asaasLoading ? (
+                    <tr>
+                      <td colSpan={5} className="px-4 py-8 text-center text-surface-500">
+                        Nenhuma subconta retornada.
+                      </td>
+                    </tr>
+                  ) : (
+                    asaasSubaccounts.map((a) => (
+                      <tr key={a.id} className="border-b border-surface-100 hover:bg-surface-50">
+                        <td className="px-4 py-3">{a.name ?? '-'}</td>
+                        <td className="px-4 py-3 text-surface-600">{a.email ?? '-'}</td>
+                        <td className="px-4 py-3 font-mono text-xs">{a.cpfCnpj ?? '-'}</td>
+                        <td className="px-4 py-3 font-mono text-xs">{a.walletId ?? '-'}</td>
+                        <td className="px-4 py-3 font-mono text-xs">
+                          <button
+                            type="button"
+                            onClick={() => copyToClipboard(a.id)}
+                            className="text-brand-600 hover:underline"
+                            title="Copiar"
+                          >
+                            {String(a.id).slice(0, 8)}…
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="px-6 py-4 flex items-center justify-between">
+              <div className="text-sm text-surface-500">
+                {asaasLoading ? 'Carregando…' : asaasHasMore ? 'Há mais resultados.' : 'Fim da lista.'}
+              </div>
+              <button
+                type="button"
+                className="btn-primary"
+                disabled={!asaasHasMore || asaasLoading}
+                onClick={() => void loadAsaasSubaccounts({ reset: false })}
+              >
+                {asaasLoading ? 'Carregando…' : 'Carregar mais'}
+              </button>
             </div>
           </div>
         )}
