@@ -7,6 +7,8 @@ import {
   maskMobile,
   maskCep,
   maskDateBr,
+  generateCpfMasked,
+  generateCnpjMasked,
   fetchByCep,
   onlyDigits,
   brDateToIso,
@@ -525,6 +527,24 @@ export default function App() {
                 <input type="email" className="input" value={form.loginEmail} onChange={(e) => setForm({ ...form, loginEmail: e.target.value })} placeholder={form.email || 'igual ao e-mail'} />
               </div>
               <div>
+                <div className="mb-2 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    className="px-3 py-2 rounded-lg bg-surface-100 text-surface-900 text-sm hover:bg-surface-200"
+                    onClick={() => setForm((f) => ({ ...f, cpfCnpj: generateCpfMasked() }))}
+                    title="Gerar um CPF válido"
+                  >
+                    Gerar CPF
+                  </button>
+                  <button
+                    type="button"
+                    className="px-3 py-2 rounded-lg bg-surface-100 text-surface-900 text-sm hover:bg-surface-200"
+                    onClick={() => setForm((f) => ({ ...f, cpfCnpj: generateCnpjMasked() }))}
+                    title="Gerar um CNPJ válido"
+                  >
+                    Gerar CNPJ
+                  </button>
+                </div>
                 <label className="label">CPF/CNPJ *</label>
                 <input
                   className="input"

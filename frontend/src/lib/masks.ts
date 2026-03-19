@@ -70,6 +70,54 @@ export function brDateToIso(value: string): string | null {
   return `${yyyy}-${mm}-${dd}`;
 }
 
+function randomDigits(count: number): string {
+  let out = '';
+  for (let i = 0; i < count; i++) out += String(Math.floor(Math.random() * 10));
+  return out;
+}
+
+// Retorna CPF no formato mascarado: 000.000.000-00
+export function generateCpfMasked(): string {
+  const base = randomDigits(9);
+  const digits = base.split('').map((n) => Number(n));
+
+  let sum1 = 0;
+  for (let i = 0; i < 9; i++) sum1 += digits[i] * (10 - i);
+  let d1 = (sum1 * 10) % 11;
+  if (d1 === 10) d1 = 0;
+
+  let sum2 = 0;
+  for (let i = 0; i < 9; i++) sum2 += digits[i] * (11 - i);
+  sum2 += d1 * 2;
+  let d2 = (sum2 * 10) % 11;
+  if (d2 === 10) d2 = 0;
+
+  return maskCpf(`${base}${d1}${d2}`);
+}
+
+// Retorna CNPJ no formato mascarado: 00.000.000/0000-00
+export function generateCnpjMasked(): string {
+  const base = randomDigits(12);
+  const digits = base.split('').map((n) => Number(n));
+
+  const weights1 = [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2];
+  let sum1 = 0;
+  for (let i = 0; i < 12; i++) sum1 += digits[i] * weights1[i];
+  let d1 = sum1 % 11;
+  if (d1 < 2) d1 = 0;
+  else d1 = 11 - d1;
+
+  const weights2 = [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2];
+  let sum2 = 0;
+  for (let i = 0; i < 12; i++) sum2 += digits[i] * weights2[i];
+  sum2 += d1 * weights2[12];
+  let d2 = sum2 % 11;
+  if (d2 < 2) d2 = 0;
+  else d2 = 11 - d2;
+
+  return maskCnpj(`${base}${d1}${d2}`);
+}
+
 export type ViaCepResponse = {
   cep: string;
   logradouro: string;

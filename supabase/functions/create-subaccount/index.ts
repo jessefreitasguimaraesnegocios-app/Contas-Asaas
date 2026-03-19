@@ -70,26 +70,33 @@ serve(async (req) => {
     const subaccountId = createData.id ?? createData.accountId;
     const walletId = createData.walletId ?? createData.wallet ?? null;
 
-    let apiKey: string | null = null;
-    const keyRes = await fetch(`${baseUrl}/v3/accounts/${subaccountId}/accessTokens`, {
-      method: "POST",
-      headers: { accept: "application/json", "content-type": "application/json", access_token: mainToken },
-      body: JSON.stringify({ name: "Chave principal" }),
-    });
-    const keyData = await keyRes.json();
-    if (keyRes.ok && keyData.apiKey) apiKey = keyData.apiKey;
+    // Importante: a API do Asaas retorna a `apiKey` junto com a criação da subconta.
+    // Assim garantimos que a chave é salva mesmo quando o endpoint `/accessTokens` falha (ex.: whitelist/perm).
+    let apiKey: string | null = createData.apiKey ?? null;
+    let keyData: any = null;
 
-    if (!keyRes.ok || !apiKey) {
-      return new Response(
-        JSON.stringify({
-          error: "Subconta criada, mas falhou ao gerar chave API da subconta",
-          details: keyData,
-          hint:
-            "A Asaas exige liberação via interface WEB e pode exigir Whitelist de IP para gerar chave de subconta. Verifique: Integrações > Chaves de API > Gerenciamento de chaves de subcontas (habilitar) e Mecanismos de segurança > Whitelist de IP.",
-          subaccountId,
-        }),
-        { status: keyRes.status || 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+    // Fallback: caso por algum motivo a chave não venha no response da criação, tentamos gerar via /accessTokens.
+    if (!apiKey) {
+      const keyRes = await fetch(`${baseUrl}/v3/accounts/${subaccountId}/accessTokens`, {
+        method: "POST",
+        headers: { accept: "application/json", "content-type": "application/json", access_token: mainToken },
+        body: JSON.stringify({ name: "Chave principal" }),
+      });
+      keyData = await keyRes.json();
+      if (keyRes.ok && keyData.apiKey) apiKey = keyData.apiKey;
+
+      if (!keyRes.ok || !apiKey) {
+        return new Response(
+          JSON.stringify({
+            error: "Subconta criada, mas falhou ao obter chave API da subconta",
+            details: keyData,
+            hint:
+              "A Asaas exige liberação via interface WEB e pode exigir Whitelist de IP para gerar chave de subconta. Verifique: Integrações > Chaves de API > Gerenciamento de chaves de subcontas (habilitar) e Mecanismos de segurança > Whitelist de IP.",
+            subaccountId,
+          }),
+          { status: keyRes.status || 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
     }
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
