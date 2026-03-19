@@ -86,13 +86,14 @@ export default function App() {
     setSubaccounts(((data ?? []) as unknown) as Subaccount[]);
   }
 
-  async function loadAsaasSubaccounts(opts?: { reset?: boolean }) {
+  async function loadAsaasSubaccounts(opts?: { reset?: boolean; environment?: 'sandbox' | 'production' }) {
     const reset = opts?.reset ?? false;
+    const env = opts?.environment ?? asaasEnvironment;
     const nextOffset = reset ? 0 : asaasOffset;
     setAsaasLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke('list-asaas-subaccounts', {
-        body: { environment: asaasEnvironment, offset: nextOffset, limit: 50 },
+        body: { environment: env, offset: nextOffset, limit: 50 },
         headers: { 'x-client-info': 'plataforma-subcontas' },
       });
       if (error) throw error;
@@ -399,7 +400,7 @@ export default function App() {
                   setMessage(null);
                   setAsaasSubaccounts([]);
                   setAsaasOffset(0);
-                  void loadAsaasSubaccounts({ reset: true });
+                void loadAsaasSubaccounts({ reset: true, environment: asaasEnvironment });
                 }}
                 className={`shrink-0 px-3 py-2 rounded-lg transition text-sm ${tab === 'asaas' ? 'bg-brand-500 text-white' : 'hover:bg-surface-800'}`}
               >
@@ -823,7 +824,7 @@ export default function App() {
                     setAsaasSubaccounts([]);
                     setAsaasOffset(0);
                     setAsaasHasMore(false);
-                    void loadAsaasSubaccounts({ reset: true });
+                    void loadAsaasSubaccounts({ reset: true, environment: env });
                   }}
                 >
                   <option value="sandbox">Sandbox</option>
