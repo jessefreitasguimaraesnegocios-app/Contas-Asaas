@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { Session } from '@supabase/supabase-js';
-import { supabase, getEdgeFunctionUrl } from './lib/supabase';
+import { supabase } from './lib/supabase';
 import {
   maskCpfCnpj,
   maskPhone,
@@ -124,23 +124,27 @@ export default function App() {
         postalCode: form.postalCode,
         incomeValue: form.incomeValue,
       };
-      const url = getEdgeFunctionUrl('create-subaccount');
-      const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY ?? '';
-      const token = session?.access_token ?? anonKey;
-      const res = await fetch(url, {
-        method: 'POST',
+
+      const { data: fnData, error: fnError } = await supabase.functions.invoke('create-subaccount', {
+        body,
         headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-          apikey: anonKey,
+          'x-client-info': 'plataforma-subcontas',
         },
-        body: JSON.stringify(body),
       });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        const msg = data?.error || data?.message || data?.details?.description || `Erro ${res.status}`;
+
+      if (fnError) {
+        const statusHint = (fnError as any)?.status ? ` (status ${(fnError as any).status})` : '';
+        const msg = fnError.message || `Erro ao criar subconta${statusHint}`;
+        if (msg.includes('403')) {
+          throw new Error(
+            msg ||
+              '403: chave do projeto não aceita. No Vercel, confira VITE_SUPABASE_ANON_KEY (anon public), depois faça Redeploy com "Clear build cache".'
+          );
+        }
         throw new Error(msg);
       }
+
+      const data = fnData as any;
       if (data?.error) throw new Error(data.error || data.details?.description || 'Erro ao criar subconta');
       setMessage({ type: 'ok', text: 'Subconta criada e salva com sucesso.' });
       setForm({ ...form, name: '', email: '', loginEmail: '', cpfCnpj: '', birthDate: '' });
@@ -155,6 +159,36 @@ export default function App() {
   function maskKey(key: string) {
     if (!key || key.length < 12) return '••••••••';
     return key.slice(0, 12) + '…' + key.slice(-6);
+  }
+
+  async function handleDeleteSubaccount(id: string) {
+    const ok = confirm(
+      'Excluir subconta?\n\n- Primeiro tenta excluir na Asaas (quando permitido)\n- Depois remove o registro do Supabase\n\nIsso pode ser irreversível na Asaas.'
+    );
+    if (!ok) return;
+
+    setMessage(null);
+    try {
+      const { error } = await supabase.functions.invoke('delete-subaccount', {
+        body: { id, mode: 'asaas_and_db', removeReason: 'Liberar dados' },
+        headers: { 'x-client-info': 'plataforma-subcontas' },
+      });
+      if (error) {
+        const fallback = confirm(
+          `Falhou excluir na Asaas.\n\n${error.message}\n\nQuer remover SOMENTE do Supabase (db_only)?`
+        );
+        if (!fallback) throw error;
+        const { error: dbOnlyErr } = await supabase.functions.invoke('delete-subaccount', {
+          body: { id, mode: 'db_only' },
+          headers: { 'x-client-info': 'plataforma-subcontas' },
+        });
+        if (dbOnlyErr) throw dbOnlyErr;
+      }
+      setMessage({ type: 'ok', text: 'Subconta excluída.' });
+      await loadSubaccounts();
+    } catch (err) {
+      setMessage({ type: 'err', text: err instanceof Error ? err.message : 'Erro ao excluir.' });
+    }
   }
 
   async function handleCepBlur() {
@@ -350,7 +384,15 @@ export default function App() {
         {tab === 'create' && (
           <div className="card p-6">
             <h2 className="text-lg font-semibold mb-6">Criar nova subconta</h2>
-            <form onSubmit={handleCreate} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <form
+              onSubmit={handleCreate}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && (e.target as HTMLElement).tagName !== 'BUTTON') {
+                  e.preventDefault();
+                }
+              }}
+              className="grid grid-cols-1 md:grid-cols-2 gap-4"
+            >
               <div>
                 <label className="label">App *</label>
                 <select
@@ -436,7 +478,11 @@ export default function App() {
                 <input
                   className="input"
                   value={form.postalCode}
-                  onChange={(e) => setForm({ ...form, postalCode: maskCep(e.target.value) })}
+                  onChange={(e) => {
+                    setMessage(null);
+                    setForm({ ...form, postalCode: maskCep(e.target.value) });
+                  }}
+                  onFocus={() => setMessage(null)}
                   onBlur={handleCepBlur}
                   placeholder="00000-000"
                   maxLength={9}
@@ -510,13 +556,14 @@ export default function App() {
                     <th className="text-left px-4 py-3 font-medium">Nome / E-mail</th>
                     <th className="text-left px-4 py-3 font-medium">ID Subconta</th>
                     <th className="text-left px-4 py-3 font-medium">Chave API</th>
+                    <th className="text-left px-4 py-3 font-medium">Ações</th>
                     <th className="text-left px-4 py-3 font-medium">Criado em</th>
                   </tr>
                 </thead>
                 <tbody>
                   {subaccounts.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="px-4 py-8 text-center text-surface-500">
+                      <td colSpan={7} className="px-4 py-8 text-center text-surface-500">
                         Nenhuma subconta ainda. Crie uma em &quot;Nova subconta&quot;.
                       </td>
                     </tr>
@@ -553,6 +600,15 @@ export default function App() {
                             title="Copiar chave"
                           >
                             {maskKey(s.api_key)}
+                          </button>
+                        </td>
+                        <td className="px-4 py-3">
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteSubaccount(s.id)}
+                            className="text-xs text-red-700 hover:underline"
+                          >
+                            Excluir
                           </button>
                         </td>
                         <td className="px-4 py-3 text-surface-500">

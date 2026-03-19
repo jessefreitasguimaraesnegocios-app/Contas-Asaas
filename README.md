@@ -61,11 +61,27 @@ O **app** faz: **navegador** → **Supabase Edge Function** (gateway) → **crea
 
 Quando a requisição chega na função, ela chama a Asaas **igual ao script** (mesmo URL, mesmo header `access_token`, mesmo body).
 
+### Erro 403 ao criar subconta (Vercel)
+
+O 403 vem do **gateway do Supabase** (a requisição nem chega na Edge Function). Faça na ordem:
+
+1. **Supabase:** Project Settings → API → copie o **anon public** (chave longa em JWT).
+2. **Vercel:** Project → Settings → Environment Variables. Apague `VITE_SUPABASE_ANON_KEY` e `VITE_SUPABASE_URL` e crie de novo:
+   - `VITE_SUPABASE_URL` = `https://SEU_PROJETO.supabase.co`
+   - `VITE_SUPABASE_ANON_KEY` = valor colado do passo 1 (sem espaços no início/fim).
+   - Confira se a URL está igual ao projeto (ex.: `hytuyyvjaukdwmdxtd**mi**.supabase.co` — não troque **mi** por **ni**).
+3. **Redeploy sem cache:** Deployments → ⋮ no último deploy → **Redeploy** → marque **Clear build cache** → Redeploy.
+4. Teste de novo; se ainda der 403, abra o app em uma aba anônima para evitar cache do navegador.
+
 ## Uso
 
 - **Apps**: na aba "Apps" são listados os apps (BARBEARIA, SORVETERIA, CLUB). Novos apps podem ser inseridos direto na tabela `public.apps` (code, name).
 - **Nova subconta**: escolha o app, ambiente (sandbox/produção), preencha os dados e clique em "Criar subconta". A função cria a subconta na Asaas, gera a chave de API e salva tudo no Supabase.
 - **Subcontas**: na aba "Subcontas" aparecem todas as subcontas com ID, e-mail e chave (mascarada). Clique no ID ou na chave para copiar.
+- **Excluir subconta**: na aba "Subcontas", o botão "Excluir" tenta:
+  - excluir na Asaas via `DELETE /v3/myAccount/` (só funciona para subcontas White Label e sem pendências; a chamada precisa usar a **chave API da própria subconta**)
+  - e depois remover o registro do Supabase
+  - se falhar excluir na Asaas, você pode escolher remover **somente** do Supabase (`db_only`) para “limpar a lista” do painel.
 
 ## Dados salvos (asaas_subaccounts)
 
