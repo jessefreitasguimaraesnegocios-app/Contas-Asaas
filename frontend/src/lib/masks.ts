@@ -52,6 +52,24 @@ export function maskCep(value: string): string {
   return `${d.slice(0, 5)}-${d.slice(5)}`;
 }
 
+/** Data BR: DD/MM/AAAA (8 dígitos) */
+export function maskDateBr(value: string): string {
+  const d = onlyDigits(value).slice(0, 8);
+  if (d.length <= 2) return d;
+  if (d.length <= 4) return `${d.slice(0, 2)}/${d.slice(2)}`;
+  return `${d.slice(0, 2)}/${d.slice(2, 4)}/${d.slice(4)}`;
+}
+
+/** Converte DD/MM/AAAA -> AAAA-MM-DD (ou null se incompleta) */
+export function brDateToIso(value: string): string | null {
+  const d = onlyDigits(value);
+  if (d.length !== 8) return null;
+  const dd = d.slice(0, 2);
+  const mm = d.slice(2, 4);
+  const yyyy = d.slice(4, 8);
+  return `${yyyy}-${mm}-${dd}`;
+}
+
 export type ViaCepResponse = {
   cep: string;
   logradouro: string;

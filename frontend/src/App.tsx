@@ -6,8 +6,10 @@ import {
   maskPhone,
   maskMobile,
   maskCep,
+  maskDateBr,
   fetchByCep,
   onlyDigits,
+  brDateToIso,
 } from './lib/masks';
 
 type App = { id: string; code: string; name: string };
@@ -119,7 +121,7 @@ export default function App() {
         email: form.email,
         loginEmail: form.loginEmail || form.email,
         cpfCnpj: form.cpfCnpj,
-        birthDate: form.birthDate,
+        birthDate: brDateToIso(form.birthDate) ?? form.birthDate,
         companyType: form.companyType,
         phone: form.phone ? onlyDigits(form.phone) || null : null,
         mobilePhone: form.mobilePhone ? onlyDigits(form.mobilePhone) || null : null,
@@ -466,7 +468,16 @@ export default function App() {
               </div>
               <div>
                 <label className="label">Data nascimento *</label>
-                <input type="date" className="input" value={form.birthDate} onChange={(e) => setForm({ ...form, birthDate: e.target.value })} required />
+                <input
+                  type="text"
+                  className="input"
+                  value={form.birthDate}
+                  inputMode="numeric"
+                  placeholder="DD/MM/AAAA"
+                  maxLength={10}
+                  onChange={(e) => setForm({ ...form, birthDate: maskDateBr(e.target.value) })}
+                  required
+                />
               </div>
               <div>
                 <label className="label">Tipo empresa</label>

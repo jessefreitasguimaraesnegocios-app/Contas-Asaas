@@ -79,6 +79,19 @@ serve(async (req) => {
     const keyData = await keyRes.json();
     if (keyRes.ok && keyData.apiKey) apiKey = keyData.apiKey;
 
+    if (!keyRes.ok || !apiKey) {
+      return new Response(
+        JSON.stringify({
+          error: "Subconta criada, mas falhou ao gerar chave API da subconta",
+          details: keyData,
+          hint:
+            "A Asaas exige liberação via interface WEB e pode exigir Whitelist de IP para gerar chave de subconta. Verifique: Integrações > Chaves de API > Gerenciamento de chaves de subcontas (habilitar) e Mecanismos de segurança > Whitelist de IP.",
+          subaccountId,
+        }),
+        { status: keyRes.status || 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
@@ -88,7 +101,7 @@ serve(async (req) => {
       environment,
       asaas_subaccount_id: subaccountId,
       asaas_wallet_id: walletId,
-      api_key: apiKey ?? "",
+      api_key: apiKey,
       email: createData.email ?? payload.email,
       login_email: payload.loginEmail ?? payload.email,
       name: createData.name ?? payload.name,
