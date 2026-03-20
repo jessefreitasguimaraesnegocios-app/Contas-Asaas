@@ -16,6 +16,21 @@
 
 ---
 
+## Carteira principal — recebe o split das subcontas
+
+Nesta configuração, **todas as subcontas** enviam parte do valor (split) para a **conta matriz** usando o `walletId` abaixo:
+
+| Campo | Valor |
+|-------|--------|
+| **`walletId` da conta principal** | `c1c11850-aced-4867-9401-6f25a4cbc2f2` |
+
+- Use esse UUID no array **`split`** ao criar a cobrança (normalmente com a **`api_key` da subconta** que emite o pagamento), com `fixedValue` e/ou `percentualValue` conforme sua regra.
+- Confirme no painel Asaas que esse `walletId` pertence à conta matriz no **mesmo ambiente** da integração (sandbox × produção podem ter carteiras diferentes).
+
+> **Repositório público:** se preferir não versionar o UUID, troque este bloco por variável de ambiente (ex.: `ASAAS_MAIN_WALLET_ID`) e documente só o nome da variável.
+
+---
+
 ## Regras práticas
 
 1. **Cobrança da subconta**  
@@ -50,16 +65,14 @@ A estrutura exata pode variar conforme o endpoint (ex.: criar cobrança). Exempl
 {
   "split": [
     {
-      "walletId": "UUID-DA-SUBCONTA-OU-OUTRA-CARTEIRA",
-      "fixedValue": 5.5
-    },
-    {
-      "walletId": "OUTRO-UUID",
+      "walletId": "c1c11850-aced-4867-9401-6f25a4cbc2f2",
       "percentualValue": 10
     }
   ]
 }
 ```
+
+*(Exemplo: 10% para a conta principal; ajuste o percentual ou use `fixedValue` conforme o contrato.)*
 
 Consulte sempre a doc oficial:
 
