@@ -18,16 +18,17 @@
 
 ## Carteira principal — recebe o split das subcontas
 
-Nesta configuração, **todas as subcontas** enviam parte do valor (split) para a **conta matriz** usando o `walletId` abaixo:
+Nesta configuração, **todas as subcontas** enviam parte do valor (split) para a **conta matriz**. O `walletId` da matriz **muda por ambiente** — use sempre o da mesma base URL da API:
 
-| Campo | Valor |
-|-------|--------|
-| **`walletId` da conta principal** | `c1c11850-aced-4867-9401-6f25a4cbc2f2` |
+| Ambiente | Base URL | `walletId` da conta principal |
+|----------|----------|-------------------------------|
+| **Sandbox** | `https://api-sandbox.asaas.com` | `5aab22ca-7a2e-4b6f-b741-8ca8542d2430` |
+| **Produção** | `https://api.asaas.com` | `c1c11850-aced-4867-9401-6f25a4cbc2f2` |
 
-- Use esse UUID no array **`split`** ao criar a cobrança (normalmente com a **`api_key` da subconta** que emite o pagamento), com `fixedValue` e/ou `percentualValue` conforme sua regra.
-- Confirme no painel Asaas que esse `walletId` pertence à conta matriz no **mesmo ambiente** da integração (sandbox × produção podem ter carteiras diferentes).
+- Inclua o UUID correto no array **`split`** ao criar a cobrança (normalmente com a **`api_key` da subconta** que emite o pagamento), com `fixedValue` e/ou `percentualValue` conforme sua regra.
+- **Nunca** use o `walletId` de produção em chamadas ao sandbox (e vice-versa).
 
-> **Repositório público:** se preferir não versionar o UUID, troque este bloco por variável de ambiente (ex.: `ASAAS_MAIN_WALLET_ID`) e documente só o nome da variável.
+> **Repositório público:** pode trocar por variáveis de ambiente, ex.: `ASAAS_MAIN_WALLET_ID_SANDBOX` e `ASAAS_MAIN_WALLET_ID` (produção), e documentar só os nomes.
 
 ---
 
@@ -59,7 +60,22 @@ Nesta configuração, **todas as subcontas** enviam parte do valor (split) para 
 
 ## Exemplo de `split` ao criar pagamento (referência)
 
-A estrutura exata pode variar conforme o endpoint (ex.: criar cobrança). Exemplo ilustrativo com **valor fixo** e **percentual**:
+A estrutura exata pode variar conforme o endpoint (ex.: criar cobrança). Exemplo com **percentual** — troque o `walletId` conforme o ambiente da chamada:
+
+**Sandbox** (`api-sandbox.asaas.com`):
+
+```json
+{
+  "split": [
+    {
+      "walletId": "5aab22ca-7a2e-4b6f-b741-8ca8542d2430",
+      "percentualValue": 10
+    }
+  ]
+}
+```
+
+**Produção** (`api.asaas.com`):
 
 ```json
 {
@@ -72,7 +88,7 @@ A estrutura exata pode variar conforme o endpoint (ex.: criar cobrança). Exempl
 }
 ```
 
-*(Exemplo: 10% para a conta principal; ajuste o percentual ou use `fixedValue` conforme o contrato.)*
+*(Ajuste o percentual ou use `fixedValue` conforme o contrato.)*
 
 Consulte sempre a doc oficial:
 
