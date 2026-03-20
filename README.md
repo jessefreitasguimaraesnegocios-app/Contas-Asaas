@@ -28,6 +28,12 @@ Sistema para criar e gerenciar subcontas Asaas (sandbox e produção), vinculada
    supabase secrets set ASAAS_MAIN_TOKEN_SANDBOX="COLE_AQUI_O_MESMO_VALOR_DO_SCRIPT"
    supabase secrets set ASAAS_MAIN_TOKEN_PRODUCTION="..."
    ```
+   Opcional (split / carteira da conta matriz por ambiente — UUIDs do painel Asaas):
+   ```bash
+   supabase secrets set ASAAS_MAIN_WALLET_ID="UUID_CARTEIRA_PRODUCAO"
+   supabase secrets set ASAAS_MAIN_WALLET_ID_SANDBOX="UUID_CARTEIRA_SANDBOX"
+   ```
+   No Dashboard: **Edge Functions → Secrets** — os nomes acima batem com o guia `docs/vincular-wallet-apikey-pagamentos-split.md`. O painel mostra **digest SHA-256** do valor; o que você cola é o token ou o UUID em texto.
 4. Deploy da função:
    ```bash
    supabase functions deploy create-subaccount

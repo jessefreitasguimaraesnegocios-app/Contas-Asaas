@@ -28,7 +28,33 @@ Nesta configuração, **todas as subcontas** enviam parte do valor (split) para 
 - Inclua o UUID correto no array **`split`** ao criar a cobrança (normalmente com a **`api_key` da subconta** que emite o pagamento), com `fixedValue` e/ou `percentualValue` conforme sua regra.
 - **Nunca** use o `walletId` de produção em chamadas ao sandbox (e vice-versa).
 
-> **Repositório público:** pode trocar por variáveis de ambiente, ex.: `ASAAS_MAIN_WALLET_ID_SANDBOX` e `ASAAS_MAIN_WALLET_ID` (produção), e documentar só os nomes.
+---
+
+## Secrets no Supabase (Edge Functions)
+
+No projeto **Sub-Contas-Asaas**, os secrets ficam em **Edge Functions → Secrets**. Nomes usados no painel / CLI:
+
+| Secret | Conteúdo |
+|--------|----------|
+| `ASAAS_MAIN_TOKEN_SANDBOX` | `access_token` da **conta principal** Asaas (sandbox) — mesmo valor que funciona no script local. |
+| `ASAAS_MAIN_TOKEN_PRODUCTION` | `access_token` da conta principal (produção). |
+| `ASAAS_MAIN_WALLET_ID` | UUID da **carteira da conta principal** em **produção** (split). |
+| `ASAAS_MAIN_WALLET_ID_SANDBOX` | UUID da **carteira da conta principal** em **sandbox** (split). |
+
+Costumam existir também (Supabase): `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_DB_URL`.
+
+**Observações:**
+
+- A coluna **Digest (SHA256)** no painel é só hash do valor para auditoria — o que você grava continua sendo **token ou UUID em texto**, não o hash.
+- `create-subaccount` e `list-asaas-subaccounts` leem **`ASAAS_MAIN_TOKEN_*`**. Os **`ASAAS_MAIN_WALLET_ID*`** servem para novas funções (ex.: cobrança com split) ou `Deno.env.get(...)` no mesmo projeto.
+- Produção e sandbox: cada secret de carteira deve ter o UUID do **mesmo ambiente** (não trocar).
+
+CLI (após `supabase link`):
+
+```bash
+supabase secrets set ASAAS_MAIN_WALLET_ID="UUID_PRODUCAO"
+supabase secrets set ASAAS_MAIN_WALLET_ID_SANDBOX="UUID_SANDBOX"
+```
 
 ---
 
@@ -102,6 +128,7 @@ Consulte sempre a doc oficial:
 
 - Subcontas criadas pela plataforma gravam no Supabase (`asaas_subaccounts`) campos como `api_key`, `asaas_wallet_id` e `environment`.
 - Use esses valores no seu outro app (variáveis de ambiente, banco ou painel de configuração por cliente).
+- **`ASAAS_MAIN_WALLET_ID` / `ASAAS_MAIN_WALLET_ID_SANDBOX`** no Supabase centralizam o UUID da matriz para montar `split` sem hardcode no repositório.
 
 ---
 
