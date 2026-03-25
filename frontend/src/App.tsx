@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from './lib/supabase';
 import {
@@ -32,10 +32,12 @@ type Subaccount = {
   apps?: { code: string; name: string } | null;
 };
 
+type Tab = 'list' | 'asaas' | 'create' | 'apps';
+
 export default function App() {
   const [session, setSession] = useState<Session | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
-  const [tab, setTab] = useState<'list' | 'asaas' | 'create' | 'apps'>('list');
+  const [tab, setTab] = useState<Tab>('list');
   const [apps, setApps] = useState<App[]>([]);
   const [subaccounts, setSubaccounts] = useState<Subaccount[]>([]);
   const [asaasLoading, setAsaasLoading] = useState(false);
@@ -223,7 +225,6 @@ export default function App() {
     return key.slice(0, 12) + '…' + key.slice(-6);
   }
 
-  const brl = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
   function formatMoneyCents(value: string | number | null | undefined) {
     const cents =
       value == null
@@ -233,11 +234,6 @@ export default function App() {
           : Number(value) || 0;
     return brl.format(cents / 100);
   }
-  function formatSplitPercent(value: string | number | null | undefined) {
-    const p = value == null ? 0 : typeof value === 'string' ? parseFloat(value) || 0 : Number(value) || 0;
-    return `${p}%`;
-  }
-
   async function handleDeleteSubaccount(id: string) {
     const ok = confirm(
       'Excluir subconta?\n\n- Primeiro tenta excluir na Asaas (quando permitido)\n- Depois remove o registro do Supabase\n\nIsso pode ser irreversível na Asaas.'
@@ -320,58 +316,65 @@ export default function App() {
     await supabase.auth.signOut();
   }
 
-  if (authLoading) {
+  const brl = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
+  const metrics = useMemo(() => {
+    const totalReceita = subaccounts.reduce((acc, item) => {
+      const cents =
+        item.monthly_fee_cents == null
+          ? 0
+          : typeof item.monthly_fee_cents === 'string'
+            ? parseInt(item.monthly_fee_cents, 10) || 0
+            : Number(item.monthly_fee_cents) || 0;
+      return acc + cents;
+    }, 0);
+    return {
+      total: subaccounts.length,
+      appsAtivos: new Set(subaccounts.map((s) => s.app_id)).size,
+      sandbox: subaccounts.filter((s) => s.environment === 'sandbox').length,
+      production: subaccounts.filter((s) => s.environment === 'production').length,
+      receitaMensal: brl.format(totalReceita / 100),
+    };
+  }, [subaccounts]);
+
+  const tabs: { id: Tab; label: string }[] = [
+    { id: 'list', label: 'Dashboard' },
+    { id: 'create', label: 'Nova Subconta' },
+    { id: 'asaas', label: 'Asaas (todas)' },
+    { id: 'apps', label: 'Apps' },
+  ];
+
+  if (authLoading || loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-surface-500">Carregando…</div>
+      <div className="min-h-screen flex items-center justify-center bg-slate-950 text-slate-300">
+        Carregando...
       </div>
     );
   }
 
   if (!session) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-surface-50 p-4">
-        <div className="card p-6 w-full max-w-md">
-          <h1 className="text-xl font-bold text-surface-900 mb-2">Plataforma Subcontas Asaas</h1>
-          <p className="text-surface-600 text-sm mb-6">Entre para criar e gerenciar subcontas.</p>
+      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-brand-900 p-4 flex items-center justify-center">
+        <div className="w-full max-w-md rounded-2xl border border-white/10 bg-white/95 p-8 shadow-2xl">
+          <h1 className="text-2xl font-semibold text-slate-900">Plataforma Subcontas</h1>
+          <p className="mt-1 text-sm text-slate-600">Entre para criar e gerenciar subcontas.</p>
           {message && (
-            <div
-              className={`mb-4 px-4 py-3 rounded-lg text-sm ${message.type === 'ok' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}
-            >
+            <div className={`mt-4 rounded-lg px-3 py-2 text-sm ${message.type === 'ok' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
               {message.text}
             </div>
           )}
-          <form onSubmit={handleLogin} className="space-y-4">
+          <form onSubmit={handleLogin} className="mt-6 space-y-4">
             <div>
               <label className="label">E-mail</label>
-              <input
-                type="email"
-                className="input"
-                value={loginEmail}
-                onChange={(e) => setLoginEmail(e.target.value)}
-                placeholder="seu@email.com"
-                autoComplete="email"
-              />
+              <input type="email" className="input" value={loginEmail} onChange={(e) => setLoginEmail(e.target.value)} autoComplete="email" />
             </div>
             <div>
               <label className="label">Senha</label>
-              <input
-                type="password"
-                className="input"
-                value={loginPassword}
-                onChange={(e) => setLoginPassword(e.target.value)}
-                placeholder="••••••••"
-                autoComplete={signUpMode ? 'new-password' : 'current-password'}
-              />
+              <input type="password" className="input" value={loginPassword} onChange={(e) => setLoginPassword(e.target.value)} autoComplete={signUpMode ? 'new-password' : 'current-password'} />
             </div>
             <button type="submit" className="btn-primary w-full" disabled={loginLoading}>
-              {loginLoading ? 'Aguarde…' : signUpMode ? 'Criar conta' : 'Entrar'}
+              {loginLoading ? 'Aguarde...' : signUpMode ? 'Criar conta' : 'Entrar'}
             </button>
-            <button
-              type="button"
-              className="text-sm text-brand-600 hover:underline"
-              onClick={() => { setSignUpMode(!signUpMode); setMessage(null); }}
-            >
+            <button type="button" className="text-sm text-brand-700 hover:underline" onClick={() => { setSignUpMode(!signUpMode); setMessage(null); }}>
               {signUpMode ? 'Já tenho conta, entrar' : 'Criar conta'}
             </button>
           </form>
@@ -380,594 +383,256 @@ export default function App() {
     );
   }
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-surface-500">Carregando…</div>
-      </div>
-    );
-  }
-
   return (
-    <div className="min-h-screen">
-      <header className="bg-surface-900 text-white px-4 md:px-6 py-4 shadow">
-        <div className="max-w-6xl mx-auto flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <h1 className="text-xl font-bold font-sans leading-tight">Plataforma Subcontas Asaas</h1>
-
-          <div className="flex flex-col gap-3 md:flex-row md:items-center md:gap-4">
-            <div className="flex items-center justify-between gap-3 md:justify-end">
-              <span className="text-surface-300 text-sm truncate max-w-[60vw] md:max-w-none">
-                {session.user?.email}
-              </span>
-              <button
-                type="button"
-                onClick={handleLogout}
-                className="px-3 py-2 rounded-lg border border-surface-600 text-sm hover:bg-surface-800"
-              >
-                Sair
-              </button>
+    <div className="min-h-screen bg-slate-100">
+      <div className="mx-auto flex max-w-[1400px]">
+        <aside className="hidden min-h-screen w-64 bg-slate-950 px-5 py-6 text-slate-200 lg:block">
+          <div className="mb-8 flex items-center gap-2">
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand-600 font-bold text-white">S</div>
+            <div>
+              <div className="text-sm text-slate-400">Painel</div>
+              <div className="font-semibold">Subcontas Pro</div>
             </div>
-
-            <nav className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1 md:overflow-visible md:pb-0 md:mx-0 md:px-0">
+          </div>
+          <nav className="space-y-2">
+            {tabs.map((item) => (
               <button
-                type="button"
-                onClick={() => setTab('list')}
-                className={`shrink-0 px-3 py-2 rounded-lg transition text-sm ${tab === 'list' ? 'bg-brand-500 text-white' : 'hover:bg-surface-800'}`}
-              >
-                Subcontas
-              </button>
-              <button
+                key={item.id}
                 type="button"
                 onClick={() => {
-                  setTab('asaas');
-                  setMessage(null);
-                  setAsaasSubaccounts([]);
-                  setAsaasOffset(0);
-                void loadAsaasSubaccounts({ reset: true, environment: asaasEnvironment });
-                }}
-                className={`shrink-0 px-3 py-2 rounded-lg transition text-sm ${tab === 'asaas' ? 'bg-brand-500 text-white' : 'hover:bg-surface-800'}`}
-              >
-                Asaas (todas)
-              </button>
-              <button
-                type="button"
-                onClick={() => setTab('create')}
-                className={`shrink-0 px-3 py-2 rounded-lg transition text-sm ${tab === 'create' ? 'bg-brand-500 text-white' : 'hover:bg-surface-800'}`}
-              >
-                Nova subconta
-              </button>
-              <button
-                type="button"
-                onClick={() => setTab('apps')}
-                className={`shrink-0 px-3 py-2 rounded-lg transition text-sm ${tab === 'apps' ? 'bg-brand-500 text-white' : 'hover:bg-surface-800'}`}
-              >
-                Apps
-              </button>
-            </nav>
-          </div>
-        </div>
-      </header>
-
-      <main className="max-w-6xl mx-auto px-4 md:px-6 py-6 md:py-8">
-        {message && (
-          <div
-            className={`mb-6 px-4 py-3 rounded-lg ${message.type === 'ok' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}
-          >
-            {message.text}
-          </div>
-        )}
-
-        {tab === 'apps' && (
-          <div className="card p-6">
-            <h2 className="text-lg font-semibold mb-4">Apps / Plataformas</h2>
-            <p className="text-surface-600 text-sm mb-4">
-              Código único para vincular subcontas (ex: BARBEARIA, SORVETERIA, CLUB). Use o mesmo código no seu sistema.
-            </p>
-            <ul className="space-y-2">
-              {apps.map((a) => (
-                <li key={a.id} className="flex items-center gap-4 py-2 border-b border-surface-100 last:border-0">
-                  <span className="font-mono font-medium text-brand-600">{a.code}</span>
-                  <span>{a.name}</span>
-                </li>
-              ))}
-            </ul>
-            <p className="text-sm text-surface-500 mt-4">
-              Para adicionar novos apps, insira na tabela <code className="bg-surface-100 px-1 rounded">public.apps</code> no Supabase (code, name).
-            </p>
-          </div>
-        )}
-
-        {tab === 'create' && (
-          <div className="card p-6">
-            <h2 className="text-lg font-semibold mb-6">Criar nova subconta</h2>
-            <form
-              onSubmit={handleCreate}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && (e.target as HTMLElement).tagName !== 'BUTTON') {
-                  e.preventDefault();
-                }
-              }}
-              className="grid grid-cols-1 md:grid-cols-2 gap-4"
-            >
-              <div>
-                <label className="label">App *</label>
-                <select
-                  className="input"
-                  value={form.app_id}
-                  onChange={(e) => setForm({ ...form, app_id: e.target.value })}
-                  required
-                >
-                  <option value="">Selecione</option>
-                  {apps.map((a) => (
-                    <option key={a.id} value={a.id}>{a.code} — {a.name}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="label">Ambiente *</label>
-                <select
-                  className="input"
-                  value={form.environment}
-                  onChange={(e) => setForm({ ...form, environment: e.target.value })}
-                >
-                  <option value="sandbox">Sandbox</option>
-                  <option value="production">Produção</option>
-                </select>
-              </div>
-              <div>
-                <label className="label">Nome *</label>
-                <input className="input" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
-              </div>
-              <div>
-                <label className="label">E-mail *</label>
-                <input type="email" className="input" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} required />
-              </div>
-              <div>
-                <label className="label">E-mail de login (se diferente)</label>
-                <input type="email" className="input" value={form.loginEmail} onChange={(e) => setForm({ ...form, loginEmail: e.target.value })} placeholder={form.email || 'igual ao e-mail'} />
-              </div>
-              <div>
-                <div className="mb-2 flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    className="px-3 py-2 rounded-lg bg-surface-100 text-surface-900 text-sm hover:bg-surface-200"
-                    onClick={() => setForm((f) => ({ ...f, cpfCnpj: generateCpfMasked() }))}
-                    title="Gerar um CPF válido"
-                  >
-                    Gerar CPF
-                  </button>
-                  <button
-                    type="button"
-                    className="px-3 py-2 rounded-lg bg-surface-100 text-surface-900 text-sm hover:bg-surface-200"
-                    onClick={() => setForm((f) => ({ ...f, cpfCnpj: generateCnpjMasked() }))}
-                    title="Gerar um CNPJ válido"
-                  >
-                    Gerar CNPJ
-                  </button>
-                </div>
-                <label className="label">CPF/CNPJ *</label>
-                <input
-                  className="input"
-                  value={form.cpfCnpj}
-                  onChange={(e) => setForm({ ...form, cpfCnpj: maskCpfCnpj(e.target.value) })}
-                  placeholder="000.000.000-00 ou 00.000.000/0000-00"
-                  maxLength={18}
-                  required
-                />
-              </div>
-              <div>
-                <label className="label">Data nascimento *</label>
-                <input
-                  type="text"
-                  className="input"
-                  value={form.birthDate}
-                  inputMode="numeric"
-                  placeholder="DD/MM/AAAA"
-                  maxLength={10}
-                  onChange={(e) => setForm({ ...form, birthDate: maskDateBr(e.target.value) })}
-                  required
-                />
-              </div>
-              <div>
-                <label className="label">Tipo empresa</label>
-                <select className="input" value={form.companyType} onChange={(e) => setForm({ ...form, companyType: e.target.value })}>
-                  <option value="MEI">MEI</option>
-                  <option value="LIMITED">LTDA</option>
-                  <option value="INDIVIDUAL">Individual</option>
-                </select>
-              </div>
-              <div>
-                <label className="label">Telefone</label>
-                <input
-                  className="input"
-                  value={form.phone}
-                  onChange={(e) => setForm({ ...form, phone: maskPhone(e.target.value) })}
-                  placeholder="(00) 0000-0000"
-                  maxLength={15}
-                />
-              </div>
-              <div>
-                <label className="label">Celular</label>
-                <input
-                  className="input"
-                  value={form.mobilePhone}
-                  onChange={(e) => setForm({ ...form, mobilePhone: maskMobile(e.target.value) })}
-                  placeholder="(00) 00000-0000"
-                  maxLength={16}
-                />
-              </div>
-              <div>
-                <label className="label">CEP *</label>
-                <input
-                  className="input"
-                  value={form.postalCode}
-                  onChange={(e) => {
-                    setMessage(null);
-                    setForm({ ...form, postalCode: maskCep(e.target.value) });
-                  }}
-                  onFocus={() => setMessage(null)}
-                  onBlur={handleCepBlur}
-                  placeholder="00000-000"
-                  maxLength={9}
-                  required
-                />
-                {loadingCep && <span className="text-xs text-surface-500 ml-2">Buscando…</span>}
-              </div>
-              <div className="md:col-span-2">
-                <label className="label">Endereço *</label>
-                <input
-                  className="input"
-                  value={form.address}
-                  onChange={(e) => setForm({ ...form, address: e.target.value })}
-                  placeholder="Preenchido pelo CEP ou digite"
-                  required
-                />
-              </div>
-              <div>
-                <label className="label">Número *</label>
-                <input
-                  className="input"
-                  value={form.addressNumber}
-                  onChange={(e) => setForm({ ...form, addressNumber: e.target.value })}
-                  required
-                />
-              </div>
-              <div>
-                <label className="label">Complemento</label>
-                <input
-                  className="input"
-                  value={form.complement}
-                  onChange={(e) => setForm({ ...form, complement: e.target.value })}
-                  placeholder="Apto, sala, etc."
-                />
-              </div>
-              <div>
-                <label className="label">Bairro *</label>
-                <input
-                  className="input"
-                  value={form.province}
-                  onChange={(e) => setForm({ ...form, province: e.target.value })}
-                  placeholder="Preenchido pelo CEP ou digite"
-                  required
-                />
-              </div>
-              <div>
-                <label className="label">Renda/Faturamento mensal</label>
-                <input type="number" className="input" value={form.incomeValue} onChange={(e) => setForm({ ...form, incomeValue: Number(e.target.value) })} />
-              </div>
-              <div>
-                <label className="label">Split (% que você ganha)</label>
-                <input
-                  type="number"
-                  className="input"
-                  value={form.splitPercent}
-                  min={0}
-                  max={100}
-                  step={0.1}
-                  onChange={(e) => setForm({ ...form, splitPercent: Number(e.target.value) })}
-                />
-              </div>
-              <div>
-                <label className="label">Mensalidade (R$)</label>
-                <input
-                  type="number"
-                  className="input"
-                  value={form.monthlyFee}
-                  min={0}
-                  step={0.01}
-                  onChange={(e) => setForm({ ...form, monthlyFee: Number(e.target.value) })}
-                />
-              </div>
-              <div className="md:col-span-2 flex justify-end pt-4">
-                <button type="submit" className="btn-primary" disabled={creating}>
-                  {creating ? 'Criando…' : 'Criar subconta'}
-                </button>
-              </div>
-            </form>
-          </div>
-        )}
-
-        {tab === 'list' && (
-          <div className="card overflow-hidden">
-            <div className="px-6 py-4 border-b border-surface-200">
-              <h2 className="text-lg font-semibold">Subcontas criadas</h2>
-              <p className="text-sm text-surface-500">Dados salvos no Supabase (id, chave API, wallet, etc.)</p>
-            </div>
-
-            {/* Mobile: cards */}
-            <div className="md:hidden divide-y divide-surface-100">
-              {subaccounts.length === 0 ? (
-                <div className="px-6 py-8 text-center text-surface-500 text-sm">
-                  Nenhuma subconta ainda. Crie uma em &quot;Nova subconta&quot;.
-                </div>
-              ) : (
-                subaccounts.map((s) => (
-                  <div key={s.id} className="px-6 py-4">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="font-mono text-brand-600 text-sm">{s.apps?.code ?? '-'}</span>
-                          <span
-                            className={`px-2 py-0.5 rounded text-xs ${s.environment === 'production' ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-700'}`}
-                          >
-                            {s.environment}
-                          </span>
-                        </div>
-                        <div className="mt-2 text-sm font-medium truncate">{s.name || '-'}</div>
-                        <div className="text-xs text-surface-500 truncate">{s.email}</div>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteSubaccount(s.id)}
-                        className="shrink-0 text-xs text-red-700 hover:underline"
-                      >
-                        Excluir
-                      </button>
-                    </div>
-
-                    <div className="mt-3 grid grid-cols-2 gap-3 text-xs">
-                      <div>
-                        <div className="text-surface-500">ID Subconta</div>
-                        <button
-                          type="button"
-                          onClick={() => copyToClipboard(s.asaas_subaccount_id)}
-                          className="font-mono text-brand-600 hover:underline"
-                          title="Copiar"
-                        >
-                          {s.asaas_subaccount_id.slice(0, 8)}…
-                        </button>
-                      </div>
-                      <div>
-                        <div className="text-surface-500">Chave API</div>
-                        <button
-                          type="button"
-                          onClick={() => copyToClipboard(s.api_key)}
-                          className="font-mono text-brand-600 hover:underline"
-                          title="Copiar chave"
-                        >
-                          {maskKey(s.api_key)}
-                        </button>
-                      </div>
-                      <div>
-                        <div className="text-surface-500">Split</div>
-                        <div className="text-surface-700">{formatSplitPercent(s.split_percent)}</div>
-                      </div>
-                      <div>
-                        <div className="text-surface-500">Mensalidade</div>
-                        <div className="text-surface-700">{formatMoneyCents(s.monthly_fee_cents)}</div>
-                      </div>
-                      <div className="col-span-2">
-                        <div className="text-surface-500">Criado em</div>
-                        <div className="text-surface-700">{new Date(s.created_at).toLocaleDateString('pt-BR')}</div>
-                      </div>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-
-            {/* Desktop: table */}
-            <div className="hidden md:block overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="bg-surface-50 border-b border-surface-200">
-                    <th className="text-left px-4 py-3 font-medium">App</th>
-                    <th className="text-left px-4 py-3 font-medium">Ambiente</th>
-                    <th className="text-left px-4 py-3 font-medium">Nome / E-mail</th>
-                    <th className="text-left px-4 py-3 font-medium">ID Subconta</th>
-                    <th className="text-left px-4 py-3 font-medium">Chave API</th>
-                    <th className="text-left px-4 py-3 font-medium">Split</th>
-                    <th className="text-left px-4 py-3 font-medium">Mensalidade</th>
-                    <th className="text-left px-4 py-3 font-medium">Ações</th>
-                    <th className="text-left px-4 py-3 font-medium">Criado em</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {subaccounts.length === 0 ? (
-                    <tr>
-                      <td colSpan={9} className="px-4 py-8 text-center text-surface-500">
-                        Nenhuma subconta ainda. Crie uma em &quot;Nova subconta&quot;.
-                      </td>
-                    </tr>
-                  ) : (
-                    subaccounts.map((s) => (
-                      <tr key={s.id} className="border-b border-surface-100 hover:bg-surface-50">
-                        <td className="px-4 py-3">
-                          <span className="font-mono text-brand-600">{s.apps?.code ?? '-'}</span>
-                        </td>
-                        <td className="px-4 py-3">
-                          <span className={`px-2 py-0.5 rounded text-xs ${s.environment === 'production' ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-700'}`}>
-                            {s.environment}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3">
-                          <div>{s.name || '-'}</div>
-                          <div className="text-surface-500">{s.email}</div>
-                        </td>
-                        <td className="px-4 py-3 font-mono text-xs">
-                          <button
-                            type="button"
-                            onClick={() => copyToClipboard(s.asaas_subaccount_id)}
-                            className="text-brand-600 hover:underline"
-                            title="Copiar"
-                          >
-                            {s.asaas_subaccount_id.slice(0, 8)}…
-                          </button>
-                        </td>
-                        <td className="px-4 py-3 font-mono text-xs">
-                          <button
-                            type="button"
-                            onClick={() => copyToClipboard(s.api_key)}
-                            className="text-brand-600 hover:underline"
-                            title="Copiar chave"
-                          >
-                            {maskKey(s.api_key)}
-                          </button>
-                        </td>
-                        <td className="px-4 py-3 text-surface-700 text-xs">{formatSplitPercent(s.split_percent)}</td>
-                        <td className="px-4 py-3 text-surface-700 text-xs">{formatMoneyCents(s.monthly_fee_cents)}</td>
-                        <td className="px-4 py-3">
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteSubaccount(s.id)}
-                            className="text-xs text-red-700 hover:underline"
-                          >
-                            Excluir
-                          </button>
-                        </td>
-                        <td className="px-4 py-3 text-surface-500">
-                          {new Date(s.created_at).toLocaleDateString('pt-BR')}
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-
-        {tab === 'asaas' && (
-          <div className="card overflow-hidden">
-            <div className="px-6 py-4 border-b border-surface-200 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-              <div>
-                <h2 className="text-lg font-semibold">Subcontas no Asaas (todas)</h2>
-                <p className="text-sm text-surface-500">Lista direta do Asaas via API (não depende do Supabase).</p>
-              </div>
-              <div className="flex items-center gap-2">
-                <label className="text-sm text-surface-600">Ambiente</label>
-                <select
-                  className="input !py-2"
-                  value={asaasEnvironment}
-                  onChange={(e) => {
-                    const env = e.target.value as 'sandbox' | 'production';
-                    setAsaasEnvironment(env);
+                  setTab(item.id);
+                  if (item.id === 'asaas') {
                     setAsaasSubaccounts([]);
                     setAsaasOffset(0);
-                    setAsaasHasMore(false);
-                    void loadAsaasSubaccounts({ reset: true, environment: env });
-                  }}
-                >
-                  <option value="sandbox">Sandbox</option>
-                  <option value="production">Produção</option>
-                </select>
-              </div>
-            </div>
-
-            {/* Mobile: cards */}
-            <div className="md:hidden divide-y divide-surface-100">
-              {asaasSubaccounts.length === 0 && !asaasLoading ? (
-                <div className="px-6 py-8 text-center text-surface-500 text-sm">Nenhuma subconta retornada.</div>
-              ) : (
-                asaasSubaccounts.map((a) => (
-                  <div key={a.id} className="px-6 py-4">
-                    <div className="text-sm font-medium truncate">{a.name ?? '-'}</div>
-                    <div className="text-xs text-surface-500 truncate">{a.email ?? '-'}</div>
-                    <div className="mt-3 grid grid-cols-2 gap-3 text-xs">
-                      <div>
-                        <div className="text-surface-500">CPF/CNPJ</div>
-                        <div className="font-mono text-surface-700 break-all">{a.cpfCnpj ?? '-'}</div>
-                      </div>
-                      <div>
-                        <div className="text-surface-500">Wallet</div>
-                        <div className="font-mono text-surface-700 break-all">{a.walletId ?? '-'}</div>
-                      </div>
-                      <div className="col-span-2">
-                        <div className="text-surface-500">ID</div>
-                        <button
-                          type="button"
-                          onClick={() => copyToClipboard(a.id)}
-                          className="font-mono text-brand-600 hover:underline break-all"
-                          title="Copiar"
-                        >
-                          {String(a.id)}
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-
-            {/* Desktop: table */}
-            <div className="hidden md:block overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="bg-surface-50 border-b border-surface-200">
-                    <th className="text-left px-4 py-3 font-medium">Nome</th>
-                    <th className="text-left px-4 py-3 font-medium">E-mail</th>
-                    <th className="text-left px-4 py-3 font-medium">CPF/CNPJ</th>
-                    <th className="text-left px-4 py-3 font-medium">Wallet</th>
-                    <th className="text-left px-4 py-3 font-medium">ID</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {asaasSubaccounts.length === 0 && !asaasLoading ? (
-                    <tr>
-                      <td colSpan={5} className="px-4 py-8 text-center text-surface-500">
-                        Nenhuma subconta retornada.
-                      </td>
-                    </tr>
-                  ) : (
-                    asaasSubaccounts.map((a) => (
-                      <tr key={a.id} className="border-b border-surface-100 hover:bg-surface-50">
-                        <td className="px-4 py-3">{a.name ?? '-'}</td>
-                        <td className="px-4 py-3 text-surface-600">{a.email ?? '-'}</td>
-                        <td className="px-4 py-3 font-mono text-xs">{a.cpfCnpj ?? '-'}</td>
-                        <td className="px-4 py-3 font-mono text-xs">{a.walletId ?? '-'}</td>
-                        <td className="px-4 py-3 font-mono text-xs">
-                          <button
-                            type="button"
-                            onClick={() => copyToClipboard(a.id)}
-                            className="text-brand-600 hover:underline"
-                            title="Copiar"
-                          >
-                            {String(a.id).slice(0, 8)}…
-                          </button>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-
-            <div className="px-6 py-4 flex items-center justify-between">
-              <div className="text-sm text-surface-500">
-                {asaasLoading ? 'Carregando…' : asaasHasMore ? 'Há mais resultados.' : 'Fim da lista.'}
-              </div>
-              <button
-                type="button"
-                className="btn-primary"
-                disabled={!asaasHasMore || asaasLoading}
-                onClick={() => void loadAsaasSubaccounts({ reset: false })}
+                    void loadAsaasSubaccounts({ reset: true, environment: asaasEnvironment });
+                  }
+                }}
+                className={`w-full rounded-xl px-3 py-2 text-left text-sm transition ${tab === item.id ? 'bg-brand-600 text-white' : 'text-slate-300 hover:bg-slate-800'}`}
               >
-                {asaasLoading ? 'Carregando…' : 'Carregar mais'}
+                {item.label}
               </button>
+            ))}
+          </nav>
+        </aside>
+
+        <div className="w-full">
+          <header className="border-b border-slate-200 bg-white px-4 py-4 md:px-8">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h1 className="text-xl font-semibold text-slate-900">Bem-vindo, Admin</h1>
+                <p className="text-sm text-slate-500">Gerencie suas subcontas e resultados.</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="hidden rounded-xl bg-slate-100 px-3 py-2 text-xs text-slate-600 md:inline">{session.user?.email}</span>
+                <button type="button" className="btn-secondary" onClick={() => setTab('create')}>Nova Subconta</button>
+                <button type="button" className="btn-primary" onClick={handleLogout}>Sair</button>
+              </div>
             </div>
-          </div>
-        )}
-      </main>
+            <div className="mt-3 flex gap-2 overflow-x-auto pb-1 lg:hidden">
+              {tabs.map((item) => (
+                <button key={item.id} type="button" onClick={() => setTab(item.id)} className={`rounded-lg px-3 py-2 text-sm ${tab === item.id ? 'bg-brand-600 text-white' : 'bg-slate-200 text-slate-700'}`}>
+                  {item.label}
+                </button>
+              ))}
+            </div>
+          </header>
+
+          <main className="p-4 md:p-8">
+            {message && (
+              <div className={`mb-4 rounded-xl px-4 py-3 ${message.type === 'ok' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                {message.text}
+              </div>
+            )}
+
+            {tab === 'list' && (
+              <div className="space-y-4">
+                <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+                  <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
+                    <p className="text-xs text-slate-500">Subcontas totais</p>
+                    <p className="mt-2 text-2xl font-semibold text-slate-900">{metrics.total}</p>
+                  </div>
+                  <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
+                    <p className="text-xs text-slate-500">Receita mensal</p>
+                    <p className="mt-2 text-2xl font-semibold text-slate-900">{metrics.receitaMensal}</p>
+                  </div>
+                  <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
+                    <p className="text-xs text-slate-500">Apps ativos</p>
+                    <p className="mt-2 text-2xl font-semibold text-slate-900">{metrics.appsAtivos}</p>
+                  </div>
+                  <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
+                    <p className="text-xs text-slate-500">Sandbox</p>
+                    <p className="mt-2 text-2xl font-semibold text-slate-900">{metrics.sandbox}</p>
+                  </div>
+                  <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
+                    <p className="text-xs text-slate-500">Produção</p>
+                    <p className="mt-2 text-2xl font-semibold text-slate-900">{metrics.production}</p>
+                  </div>
+                </section>
+
+                <section className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200">
+                  <div className="border-b border-slate-200 px-5 py-4">
+                    <h2 className="text-lg font-semibold text-slate-900">Subcontas recentes</h2>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead className="bg-slate-50 text-slate-600">
+                        <tr>
+                          <th className="px-4 py-3 text-left font-medium">Cliente</th>
+                          <th className="px-4 py-3 text-left font-medium">App</th>
+                          <th className="px-4 py-3 text-left font-medium">Ambiente</th>
+                          <th className="px-4 py-3 text-left font-medium">ID</th>
+                          <th className="px-4 py-3 text-left font-medium">Chave API</th>
+                          <th className="px-4 py-3 text-left font-medium">Mensalidade</th>
+                          <th className="px-4 py-3 text-left font-medium">Ações</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {subaccounts.length === 0 ? (
+                          <tr><td colSpan={7} className="px-4 py-8 text-center text-slate-500">Nenhuma subconta ainda.</td></tr>
+                        ) : (
+                          subaccounts.map((s) => (
+                            <tr key={s.id} className="border-t border-slate-100">
+                              <td className="px-4 py-3">
+                                <div className="font-medium text-slate-900">{s.name || '-'}</div>
+                                <div className="text-xs text-slate-500">{s.email}</div>
+                              </td>
+                              <td className="px-4 py-3 font-mono text-brand-700">{s.apps?.code ?? '-'}</td>
+                              <td className="px-4 py-3">
+                                <span className={`rounded-md px-2 py-1 text-xs ${s.environment === 'production' ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-700'}`}>{s.environment}</span>
+                              </td>
+                              <td className="px-4 py-3 font-mono text-xs">
+                                <button type="button" className="text-brand-700 hover:underline" onClick={() => copyToClipboard(s.asaas_subaccount_id)}>{s.asaas_subaccount_id.slice(0, 8)}...</button>
+                              </td>
+                              <td className="px-4 py-3 font-mono text-xs">
+                                <button type="button" className="text-brand-700 hover:underline" onClick={() => copyToClipboard(s.api_key)}>{maskKey(s.api_key)}</button>
+                              </td>
+                              <td className="px-4 py-3 text-slate-700">{formatMoneyCents(s.monthly_fee_cents)}</td>
+                              <td className="px-4 py-3">
+                                <button type="button" className="text-xs text-red-700 hover:underline" onClick={() => handleDeleteSubaccount(s.id)}>Excluir</button>
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </section>
+              </div>
+            )}
+
+            {tab === 'apps' && (
+              <div className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
+                <h2 className="text-lg font-semibold text-slate-900">Apps / Plataformas</h2>
+                <p className="mt-1 text-sm text-slate-600">Código único para vincular subcontas ao seu sistema.</p>
+                <ul className="mt-4 space-y-2">
+                  {apps.map((a) => (
+                    <li key={a.id} className="flex items-center gap-3 rounded-lg bg-slate-50 px-3 py-2">
+                      <span className="font-mono font-medium text-brand-700">{a.code}</span>
+                      <span className="text-slate-700">{a.name}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {tab === 'create' && (
+              <div className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
+                <h2 className="text-lg font-semibold text-slate-900">Criar nova subconta</h2>
+                <form onSubmit={handleCreate} className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <div><label className="label">App *</label><select className="input" value={form.app_id} onChange={(e) => setForm({ ...form, app_id: e.target.value })} required><option value="">Selecione</option>{apps.map((a) => (<option key={a.id} value={a.id}>{a.code} - {a.name}</option>))}</select></div>
+                  <div><label className="label">Ambiente *</label><select className="input" value={form.environment} onChange={(e) => setForm({ ...form, environment: e.target.value })}><option value="sandbox">Sandbox</option><option value="production">Produção</option></select></div>
+                  <div><label className="label">Nome *</label><input className="input" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required /></div>
+                  <div><label className="label">E-mail *</label><input type="email" className="input" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} required /></div>
+                  <div><label className="label">E-mail de login</label><input type="email" className="input" value={form.loginEmail} onChange={(e) => setForm({ ...form, loginEmail: e.target.value })} /></div>
+                  <div>
+                    <div className="mb-2 flex gap-2">
+                      <button type="button" className="btn-secondary !py-1.5 text-sm" onClick={() => setForm((f) => ({ ...f, cpfCnpj: generateCpfMasked() }))}>Gerar CPF</button>
+                      <button type="button" className="btn-secondary !py-1.5 text-sm" onClick={() => setForm((f) => ({ ...f, cpfCnpj: generateCnpjMasked() }))}>Gerar CNPJ</button>
+                    </div>
+                    <label className="label">CPF/CNPJ *</label>
+                    <input className="input" value={form.cpfCnpj} onChange={(e) => setForm({ ...form, cpfCnpj: maskCpfCnpj(e.target.value) })} maxLength={18} required />
+                  </div>
+                  <div><label className="label">Data nascimento *</label><input type="text" className="input" value={form.birthDate} maxLength={10} onChange={(e) => setForm({ ...form, birthDate: maskDateBr(e.target.value) })} required /></div>
+                  <div><label className="label">Tipo empresa</label><select className="input" value={form.companyType} onChange={(e) => setForm({ ...form, companyType: e.target.value })}><option value="MEI">MEI</option><option value="LIMITED">LTDA</option><option value="INDIVIDUAL">Individual</option></select></div>
+                  <div><label className="label">Telefone</label><input className="input" value={form.phone} onChange={(e) => setForm({ ...form, phone: maskPhone(e.target.value) })} maxLength={15} /></div>
+                  <div><label className="label">Celular</label><input className="input" value={form.mobilePhone} onChange={(e) => setForm({ ...form, mobilePhone: maskMobile(e.target.value) })} maxLength={16} /></div>
+                  <div><label className="label">CEP *</label><input className="input" value={form.postalCode} onChange={(e) => setForm({ ...form, postalCode: maskCep(e.target.value) })} onBlur={handleCepBlur} maxLength={9} required />{loadingCep && <span className="ml-2 text-xs text-slate-500">Buscando...</span>}</div>
+                  <div><label className="label">Bairro *</label><input className="input" value={form.province} onChange={(e) => setForm({ ...form, province: e.target.value })} required /></div>
+                  <div className="md:col-span-2"><label className="label">Endereço *</label><input className="input" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} required /></div>
+                  <div><label className="label">Número *</label><input className="input" value={form.addressNumber} onChange={(e) => setForm({ ...form, addressNumber: e.target.value })} required /></div>
+                  <div><label className="label">Complemento</label><input className="input" value={form.complement} onChange={(e) => setForm({ ...form, complement: e.target.value })} /></div>
+                  <div><label className="label">Renda mensal</label><input type="number" className="input" value={form.incomeValue} onChange={(e) => setForm({ ...form, incomeValue: Number(e.target.value) })} /></div>
+                  <div><label className="label">Split (%)</label><input type="number" className="input" value={form.splitPercent} min={0} max={100} step={0.1} onChange={(e) => setForm({ ...form, splitPercent: Number(e.target.value) })} /></div>
+                  <div><label className="label">Mensalidade (R$)</label><input type="number" className="input" value={form.monthlyFee} min={0} step={0.01} onChange={(e) => setForm({ ...form, monthlyFee: Number(e.target.value) })} /></div>
+                  <div className="flex items-end justify-end md:col-span-2"><button type="submit" className="btn-primary" disabled={creating}>{creating ? 'Criando...' : 'Criar subconta'}</button></div>
+                </form>
+              </div>
+            )}
+
+            {tab === 'asaas' && (
+              <div className="rounded-2xl bg-white shadow-sm ring-1 ring-slate-200 overflow-hidden">
+                <div className="border-b border-slate-200 px-5 py-4 flex flex-wrap items-center justify-between gap-2">
+                  <h2 className="text-lg font-semibold text-slate-900">Subcontas no Asaas</h2>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-slate-600">Ambiente</span>
+                    <select
+                      className="input !py-2"
+                      value={asaasEnvironment}
+                      onChange={(e) => {
+                        const env = e.target.value as 'sandbox' | 'production';
+                        setAsaasEnvironment(env);
+                        setAsaasSubaccounts([]);
+                        setAsaasOffset(0);
+                        setAsaasHasMore(false);
+                        void loadAsaasSubaccounts({ reset: true, environment: env });
+                      }}
+                    >
+                      <option value="sandbox">Sandbox</option>
+                      <option value="production">Produção</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead className="bg-slate-50 text-slate-600">
+                      <tr>
+                        <th className="px-4 py-3 text-left font-medium">Nome</th>
+                        <th className="px-4 py-3 text-left font-medium">E-mail</th>
+                        <th className="px-4 py-3 text-left font-medium">CPF/CNPJ</th>
+                        <th className="px-4 py-3 text-left font-medium">Wallet</th>
+                        <th className="px-4 py-3 text-left font-medium">ID</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {asaasSubaccounts.length === 0 && !asaasLoading ? (
+                        <tr><td colSpan={5} className="px-4 py-8 text-center text-slate-500">Nenhuma subconta retornada.</td></tr>
+                      ) : (
+                        asaasSubaccounts.map((a) => (
+                          <tr key={a.id} className="border-t border-slate-100">
+                            <td className="px-4 py-3">{a.name ?? '-'}</td>
+                            <td className="px-4 py-3 text-slate-600">{a.email ?? '-'}</td>
+                            <td className="px-4 py-3 font-mono text-xs">{a.cpfCnpj ?? '-'}</td>
+                            <td className="px-4 py-3 font-mono text-xs">{a.walletId ?? '-'}</td>
+                            <td className="px-4 py-3 font-mono text-xs">
+                              <button type="button" className="text-brand-700 hover:underline" onClick={() => copyToClipboard(a.id)}>{String(a.id).slice(0, 8)}...</button>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="flex items-center justify-between px-5 py-4">
+                  <p className="text-sm text-slate-500">{asaasLoading ? 'Carregando...' : asaasHasMore ? 'Há mais resultados.' : 'Fim da lista.'}</p>
+                  <button type="button" className="btn-primary" disabled={!asaasHasMore || asaasLoading} onClick={() => void loadAsaasSubaccounts({ reset: false })}>
+                    {asaasLoading ? 'Carregando...' : 'Carregar mais'}
+                  </button>
+                </div>
+              </div>
+            )}
+          </main>
+        </div>
+      </div>
     </div>
   );
 }
