@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from './lib/supabase';
 import {
@@ -35,6 +35,8 @@ type Subaccount = {
 type Tab = 'list' | 'asaas' | 'create' | 'apps';
 
 export default function App() {
+  /** Evita recarregar o dashboard no mesmo momento do bootstrap (corrida de requests). */
+  const prevTabRef = useRef<Tab | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [tab, setTab] = useState<Tab>('list');
@@ -164,12 +166,16 @@ export default function App() {
   useEffect(() => {
     if (!session) {
       setLoading(false);
+      prevTabRef.current = null;
       return;
     }
     (async () => {
       setLoading(true);
       setMessage(null);
-      const { data: appsData } = await supabase.from('apps').select('id, code, name').order('code');
+      const { data: appsData, error: appsError } = await supabase.from('apps').select('id, code, name').order('code');
+      if (appsError) {
+        setMessage({ type: 'err', text: `Erro ao carregar apps: ${appsError.message}` });
+      }
       const appsList = (appsData as App[]) || [];
       setApps(appsList);
       await loadSubaccounts(appsList);
@@ -177,15 +183,19 @@ export default function App() {
     })();
   }, [session]);
 
-  // Garante que ao entrar na aba "Subcontas" a lista esteja sempre atualizada
+  // Recarrega o dashboard só ao voltar para a aba a partir de outra (evita corrida com o bootstrap).
   useEffect(() => {
     if (!session) return;
-    if (tab !== 'list') return;
-    // Carrega sem bloquear a tela inteira; evita estado "criou e não apareceu".
-    setMessage(null);
-    void loadSubaccounts();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tab, session]);
+    if (tab !== 'list') {
+      prevTabRef.current = tab;
+      return;
+    }
+    if (prevTabRef.current != null && prevTabRef.current !== 'list') {
+      setMessage(null);
+      void loadSubaccounts(apps);
+    }
+    prevTabRef.current = tab;
+  }, [tab, session, apps]);
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
@@ -240,7 +250,7 @@ export default function App() {
       if (data?.error) throw new Error(data.error || data.details?.description || 'Erro ao criar subconta');
       setMessage({ type: 'ok', text: 'Subconta criada e salva com sucesso.' });
       setForm({ ...form, name: '', email: '', loginEmail: '', cpfCnpj: '', birthDate: '' });
-      await loadSubaccounts();
+      await loadSubaccounts(apps);
       setTab('list');
     } catch (err) {
       setMessage({ type: 'err', text: err instanceof Error ? err.message : 'Erro ao criar.' });
@@ -287,7 +297,7 @@ export default function App() {
         if (dbOnlyErr) throw dbOnlyErr;
       }
       setMessage({ type: 'ok', text: 'Subconta excluída.' });
-      await loadSubaccounts();
+      await loadSubaccounts(apps);
     } catch (err) {
       setMessage({ type: 'err', text: err instanceof Error ? err.message : 'Erro ao excluir.' });
     }

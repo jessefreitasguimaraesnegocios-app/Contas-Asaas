@@ -14,7 +14,8 @@ Sistema para criar e gerenciar subcontas Asaas (sandbox e produção), vinculada
 
 1. Crie um projeto em [supabase.com](https://supabase.com).
 2. No SQL Editor, rode o conteúdo de `supabase/migrations/20260316000001_initial_schema.sql` para criar as tabelas `apps` e `asaas_subaccounts`.
-3. (Opcional) Ajuste RLS nas tabelas conforme sua política de acesso.
+3. Rode também `supabase/migrations/20260325120000_rls_authenticated_dashboard.sql` se o dashboard (Vercel) mostrar **KPIs zerados e tabela vazia** sem mensagem de erro: isso concede `FOR ALL` ao role `authenticated` nas tabelas usadas pelo app logado.
+4. (Opcional) Ajuste RLS adicional conforme sua política de acesso.
 
 ### 2. Edge Function `create-subaccount`
 
