@@ -75,19 +75,44 @@ export default function App() {
     monthlyFee: 50,
   });
 
-  async function loadApps() {
-    const { data } = await supabase.from('apps').select('id, code, name').order('code');
-    setApps((data as App[]) || []);
-  }
-
-  async function loadSubaccounts() {
-    const { data } = await supabase
+  async function loadSubaccounts(appSource?: App[]) {
+    const { data, error } = await supabase
       .from('asaas_subaccounts')
       .select(
         'id, app_id, environment, asaas_subaccount_id, asaas_wallet_id, api_key, email, name, cpf_cnpj, status, split_percent, monthly_fee_cents, created_at, apps(code, name)'
       )
       .order('created_at', { ascending: false });
-    setSubaccounts(((data ?? []) as unknown) as Subaccount[]);
+    if (!error) {
+      setSubaccounts(((data ?? []) as unknown) as Subaccount[]);
+      return;
+    }
+
+    // Fallback: if relational select fails, load base fields anyway.
+    const { data: fallbackData, error: fallbackError } = await supabase
+      .from('asaas_subaccounts')
+      .select('id, app_id, environment, asaas_subaccount_id, asaas_wallet_id, api_key, email, name, cpf_cnpj, status, split_percent, monthly_fee_cents, created_at')
+      .order('created_at', { ascending: false });
+
+    if (fallbackError) {
+      setSubaccounts([]);
+      setMessage({
+        type: 'err',
+        text: `Erro ao carregar subcontas: ${fallbackError.message || error.message}`,
+      });
+      return;
+    }
+
+    // If relation was unavailable, map app_id to local app list.
+    const appMap = new Map((appSource ?? apps).map((item) => [item.id, item]));
+    const normalized = ((fallbackData ?? []) as unknown as Subaccount[]).map((item) => ({
+      ...item,
+      apps: appMap.get(item.app_id) ?? null,
+    }));
+    setSubaccounts(normalized);
+    setMessage({
+      type: 'err',
+      text: 'Subcontas carregadas sem relacionamento de apps. Verifique policies/foreign key.',
+    });
   }
 
   async function loadAsaasSubaccounts(opts?: { reset?: boolean; environment?: 'sandbox' | 'production' }) {
@@ -143,8 +168,11 @@ export default function App() {
     }
     (async () => {
       setLoading(true);
-      await loadApps();
-      await loadSubaccounts();
+      setMessage(null);
+      const { data: appsData } = await supabase.from('apps').select('id, code, name').order('code');
+      const appsList = (appsData as App[]) || [];
+      setApps(appsList);
+      await loadSubaccounts(appsList);
       setLoading(false);
     })();
   }, [session]);
@@ -154,6 +182,7 @@ export default function App() {
     if (!session) return;
     if (tab !== 'list') return;
     // Carrega sem bloquear a tela inteira; evita estado "criou e não apareceu".
+    setMessage(null);
     void loadSubaccounts();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab, session]);
