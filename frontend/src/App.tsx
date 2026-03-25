@@ -388,10 +388,10 @@ export default function App() {
       <div className="mx-auto flex max-w-[1400px]">
         <aside className="hidden min-h-screen w-64 bg-slate-950 px-5 py-6 text-slate-200 lg:block">
           <div className="mb-8 flex items-center gap-2">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand-600 font-bold text-white">S</div>
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand-600 font-bold text-white">A</div>
             <div>
               <div className="text-sm text-slate-400">Painel</div>
-              <div className="font-semibold">Subcontas Pro</div>
+              <div className="font-semibold">AsaaS</div>
             </div>
           </div>
           <nav className="space-y-2">
