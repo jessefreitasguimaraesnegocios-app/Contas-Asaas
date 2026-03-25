@@ -273,9 +273,9 @@ export default function App() {
           : Number(value) || 0;
     return brl.format(cents / 100);
   }
-  async function handleDeleteSubaccount(id: string) {
+  async function handleDeleteSubaccount(id: string, label?: string) {
     const ok = confirm(
-      'Excluir subconta?\n\n- Primeiro tenta excluir na Asaas (quando permitido)\n- Depois remove o registro do Supabase\n\nIsso pode ser irreversível na Asaas.'
+      `Confirma a exclusao desta subconta${label ? ` (${label})` : ''}?\n\n- Primeiro tenta excluir na Asaas (quando permitido)\n- Depois remove o registro do Supabase\n\nIsso pode ser irreversivel na Asaas.`
     );
     if (!ok) return;
 
@@ -547,7 +547,13 @@ export default function App() {
                               </td>
                               <td className="px-4 py-3 text-slate-700">{formatMoneyCents(s.monthly_fee_cents)}</td>
                               <td className="px-4 py-3">
-                                <button type="button" className="text-xs text-red-700 hover:underline" onClick={() => handleDeleteSubaccount(s.id)}>Excluir</button>
+                                <button
+                                  type="button"
+                                  className="text-xs text-red-700 hover:underline"
+                                  onClick={() => handleDeleteSubaccount(s.id, s.name || s.email)}
+                                >
+                                  Excluir
+                                </button>
                               </td>
                             </tr>
                           ))
