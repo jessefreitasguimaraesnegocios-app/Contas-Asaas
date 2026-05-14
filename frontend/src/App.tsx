@@ -47,6 +47,47 @@ type Subaccount = {
 
 type Tab = 'list' | 'asaas' | 'create' | 'apps';
 
+type TabItemDef = { id: Tab; label: string; blurb: string };
+
+const TAB_ITEMS: TabItemDef[] = [
+  { id: 'list', label: 'Dashboard', blurb: 'Métricas e subcontas' },
+  { id: 'create', label: 'Nova Subconta', blurb: 'Cadastro no Asaas' },
+  { id: 'asaas', label: 'Asaas (todas)', blurb: 'Lista via API' },
+  { id: 'apps', label: 'Apps', blurb: 'Plataformas' },
+];
+
+function SidebarNavIcon({ id, className }: { id: Tab; className: string }) {
+  const c = `h-[1.125rem] w-[1.125rem] shrink-0 transition-colors ${className}`;
+  switch (id) {
+    case 'list':
+      return (
+        <svg className={c} fill="none" viewBox="0 0 24 24" strokeWidth={1.75} stroke="currentColor" aria-hidden>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M4 5a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM14 5a1 1 0 011-1h4a1 1 0 011 1v2a1 1 0 01-1 1h-4a1 1 0 01-1-1V5zM4 16a1 1 0 011-1h4a1 1 0 011 1v3a1 1 0 01-1 1H5a1 1 0 01-1-1v-3zM14 13a1 1 0 011-1h4a1 1 0 011 1v6a1 1 0 01-1 1h-4a1 1 0 01-1-1v-6z" />
+        </svg>
+      );
+    case 'create':
+      return (
+        <svg className={c} fill="none" viewBox="0 0 24 24" strokeWidth={1.75} stroke="currentColor" aria-hidden>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+        </svg>
+      );
+    case 'asaas':
+      return (
+        <svg className={c} fill="none" viewBox="0 0 24 24" strokeWidth={1.75} stroke="currentColor" aria-hidden>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 18.75a60.07 60.07 0 0115.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 013 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c1.036 0 1.875.84 1.875 1.875V17.25m-9-1.875h.008v.008H12V15.375z" />
+        </svg>
+      );
+    case 'apps':
+      return (
+        <svg className={c} fill="none" viewBox="0 0 24 24" strokeWidth={1.75} stroke="currentColor" aria-hidden>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M6 6.75A.75.75 0 016.75 6h10.5a.75.75 0 01.75.75v10.5a.75.75 0 01-.75.75H6.75a.75.75 0 01-.75-.75V6.75zM6.75 4.5h10.5A2.25 2.25 0 0119.5 6.75v10.5a2.25 2.25 0 01-2.25 2.25H6.75a2.25 2.25 0 01-2.25-2.25V6.75A2.25 2.25 0 016.75 4.5z" />
+        </svg>
+      );
+    default:
+      return null;
+  }
+}
+
 export default function App() {
   /** Evita recarregar o dashboard no mesmo momento do bootstrap (corrida de requests). */
   const prevTabRef = useRef<Tab | null>(null);
@@ -175,6 +216,15 @@ export default function App() {
       setMessage({ type: 'err', text: `${baseMsg}${status}${details}` });
     } finally {
       setAsaasLoading(false);
+    }
+  }
+
+  function goTab(next: Tab) {
+    setTab(next);
+    if (next === 'asaas') {
+      setAsaasSubaccounts([]);
+      setAsaasOffset(0);
+      void loadAsaasSubaccounts({ reset: true, environment: asaasEnvironment });
     }
   }
 
@@ -425,17 +475,11 @@ export default function App() {
     return m;
   }, [subaccounts, asaasEnvironment]);
 
-  const tabs: { id: Tab; label: string }[] = [
-    { id: 'list', label: 'Dashboard' },
-    { id: 'create', label: 'Nova Subconta' },
-    { id: 'asaas', label: 'Asaas (todas)' },
-    { id: 'apps', label: 'Apps' },
-  ];
-
   if (authLoading || loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-950 text-slate-300">
-        Carregando...
+      <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-gradient-to-b from-[#0b1020] via-slate-950 to-slate-950 text-slate-300">
+        <div className="h-10 w-10 animate-spin rounded-full border-2 border-brand-400 border-t-transparent" aria-hidden />
+        <p className="text-sm font-medium tracking-wide text-slate-400">Carregando…</p>
       </div>
     );
   }
@@ -473,68 +517,113 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-100">
-      <div className="mx-auto flex max-w-[1400px]">
-        <aside className="hidden min-h-screen w-64 bg-slate-950 px-5 py-6 text-slate-200 lg:block">
-          <div className="mb-8 flex items-center gap-2">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand-600 font-bold text-white">A</div>
-            <div>
-              <div className="text-sm text-slate-400">Painel</div>
-              <div className="font-semibold">AsaaS</div>
+    <div className="min-h-screen bg-gradient-to-br from-slate-100 via-slate-50 to-brand-50/40">
+      <div className="mx-auto flex max-w-[1440px]">
+        <aside className="relative hidden min-h-screen w-[280px] shrink-0 lg:block">
+          <div
+            className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_100%_70%_at_0%_-10%,rgba(56,189,248,0.22),transparent_50%)]"
+            aria-hidden
+          />
+          <div className="relative flex min-h-screen flex-col border-r border-white/[0.07] bg-gradient-to-b from-[#0b1020] via-slate-950 to-[#060a12] px-4 py-8 text-slate-200 shadow-[4px_0_24px_-8px_rgba(0,0,0,0.45)]">
+            <div className="mb-10 flex items-center gap-3.5 px-1">
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-sky-400 via-brand-500 to-brand-700 text-lg font-bold tracking-tight text-white shadow-lg shadow-brand-950/50 ring-1 ring-white/20">
+                A
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-brand-300/90">Painel</p>
+                <p className="truncate font-semibold tracking-tight text-white text-lg leading-tight">Subcontas</p>
+                <p className="mt-0.5 truncate text-[11px] text-slate-500">Asaas · multi-app</p>
+              </div>
+            </div>
+            <nav className="flex flex-1 flex-col gap-1.5" aria-label="Navegação principal">
+              {TAB_ITEMS.map((item) => {
+                const active = tab === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => goTab(item.id)}
+                    className={[
+                      'group relative w-full overflow-hidden rounded-2xl px-3 py-3 text-left outline-none transition-all duration-300 focus-visible:ring-2 focus-visible:ring-brand-400/80 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950',
+                      active
+                        ? 'bg-gradient-to-r from-brand-600 via-brand-500 to-sky-500 text-white shadow-lg shadow-brand-950/40 ring-1 ring-white/15'
+                        : 'text-slate-400 hover:bg-white/[0.06] hover:text-slate-100 hover:shadow-md hover:shadow-black/20',
+                    ].join(' ')}
+                  >
+                    {active ? (
+                      <span
+                        className="pointer-events-none absolute inset-y-3 left-0 w-0.5 rounded-full bg-white shadow-[0_0_14px_rgba(255,255,255,0.75)]"
+                        aria-hidden
+                      />
+                    ) : null}
+                    <span className="relative flex items-start gap-3.5 pl-1">
+                      <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-white/[0.04] ring-1 ring-white/[0.06] group-hover:bg-white/[0.08]">
+                        <SidebarNavIcon
+                          id={item.id}
+                          className={active ? 'text-white' : 'text-slate-500 group-hover:text-brand-300'}
+                        />
+                      </span>
+                      <span className="flex min-w-0 flex-col gap-0.5 pt-0.5">
+                        <span className="text-sm font-semibold leading-tight tracking-tight">{item.label}</span>
+                        <span className={active ? 'text-xs text-white/70' : 'text-xs text-slate-500 group-hover:text-slate-400'}>
+                          {item.blurb}
+                        </span>
+                      </span>
+                    </span>
+                  </button>
+                );
+              })}
+            </nav>
+            <div className="mt-auto border-t border-white/[0.06] pt-6">
+              <p className="px-2 text-[11px] leading-relaxed text-slate-500">Sandbox e produção · gestão centralizada</p>
             </div>
           </div>
-          <nav className="space-y-2">
-            {tabs.map((item) => (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => {
-                  setTab(item.id);
-                  if (item.id === 'asaas') {
-                    setAsaasSubaccounts([]);
-                    setAsaasOffset(0);
-                    void loadAsaasSubaccounts({ reset: true, environment: asaasEnvironment });
-                  }
-                }}
-                className={`w-full rounded-xl px-3 py-2 text-left text-sm transition ${tab === item.id ? 'bg-brand-600 text-white' : 'text-slate-300 hover:bg-slate-800'}`}
-              >
-                {item.label}
-              </button>
-            ))}
-          </nav>
         </aside>
 
-        <div className="w-full">
-          <header className="border-b border-slate-200 bg-white px-4 py-4 md:px-8">
+        <div className="min-w-0 flex-1">
+          <header className="sticky top-0 z-10 border-b border-slate-200/80 bg-white/85 px-4 py-4 shadow-sm shadow-slate-200/50 backdrop-blur-md md:px-8">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <h1 className="text-xl font-semibold text-slate-900">Bem-vindo, Admin</h1>
-                <p className="text-sm text-slate-500">Gerencie suas subcontas e resultados.</p>
+                <h1 className="text-xl font-semibold tracking-tight text-slate-900 md:text-2xl">Bem-vindo, Admin</h1>
+                <p className="mt-1 text-sm text-slate-500">Gerencie subcontas, apps e integração Asaas.</p>
               </div>
-              <div className="flex items-center gap-2">
-                <span className="hidden rounded-xl bg-slate-100 px-3 py-2 text-xs text-slate-600 md:inline">{session.user?.email}</span>
-                <button type="button" className="btn-secondary" onClick={() => setTab('create')}>Nova Subconta</button>
-                <button type="button" className="btn-primary" onClick={handleLogout}>Sair</button>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="hidden max-w-[200px] truncate rounded-xl border border-slate-200/80 bg-slate-50/90 px-3 py-2 text-xs text-slate-600 md:inline">
+                  {session.user?.email}
+                </span>
+                <button type="button" className="btn-secondary shadow-sm" onClick={() => goTab('create')}>
+                  Nova Subconta
+                </button>
+                <button type="button" className="btn-primary shadow-md shadow-brand-600/20" onClick={handleLogout}>
+                  Sair
+                </button>
               </div>
             </div>
-            <div className="mt-3 flex gap-2 overflow-x-auto pb-1 lg:hidden">
-              {tabs.map((item) => (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => {
-                    setTab(item.id);
-                    if (item.id === 'asaas') {
-                      setAsaasSubaccounts([]);
-                      setAsaasOffset(0);
-                      void loadAsaasSubaccounts({ reset: true, environment: asaasEnvironment });
-                    }
-                  }}
-                  className={`rounded-lg px-3 py-2 text-sm ${tab === item.id ? 'bg-brand-600 text-white' : 'bg-slate-200 text-slate-700'}`}
-                >
-                  {item.label}
-                </button>
-              ))}
+            <div className="mt-4 flex gap-2 overflow-x-auto pb-1 pt-0.5 lg:hidden [-webkit-overflow-scrolling:touch]">
+              {TAB_ITEMS.map((item) => {
+                const active = tab === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => goTab(item.id)}
+                    className={[
+                      'group inline-flex shrink-0 items-center gap-2 rounded-full px-4 py-2.5 text-sm font-semibold tracking-tight shadow-sm transition-all duration-300',
+                      active
+                        ? 'bg-gradient-to-r from-brand-600 to-brand-500 text-white shadow-md shadow-brand-600/25 ring-1 ring-white/20'
+                        : 'border border-slate-200/90 bg-white/95 text-slate-600 hover:border-brand-200 hover:bg-brand-50/50 hover:text-brand-800',
+                    ].join(' ')}
+                  >
+                    <span className="flex h-7 w-7 items-center justify-center rounded-full bg-black/[0.04] ring-1 ring-black/[0.06]">
+                      <SidebarNavIcon
+                        id={item.id}
+                        className={active ? 'text-white' : 'text-slate-500 group-hover:text-brand-600'}
+                      />
+                    </span>
+                    <span className="max-w-[9.5rem] truncate">{item.label}</span>
+                  </button>
+                );
+              })}
             </div>
           </header>
 
