@@ -15,6 +15,19 @@ import {
 } from './lib/masks';
 
 type App = { id: string; code: string; name: string };
+
+/** Item retornado pelo GET /v3/accounts do Asaas (listagem). */
+type AsaasAccountRow = {
+  id: string;
+  name?: string | null;
+  email?: string | null;
+  cpfCnpj?: string | null;
+  walletId?: string | null;
+  loginEmail?: string | null;
+  personType?: string | null;
+  companyType?: string | null;
+};
+
 type Subaccount = {
   id: string;
   app_id: string;
@@ -46,7 +59,7 @@ export default function App() {
   const [asaasEnvironment, setAsaasEnvironment] = useState<'sandbox' | 'production'>('sandbox');
   const [asaasOffset, setAsaasOffset] = useState(0);
   const [asaasHasMore, setAsaasHasMore] = useState(false);
-  const [asaasSubaccounts, setAsaasSubaccounts] = useState<any[]>([]);
+  const [asaasSubaccounts, setAsaasSubaccounts] = useState<AsaasAccountRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [message, setMessage] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
@@ -76,6 +89,18 @@ export default function App() {
     splitPercent: 10,
     monthlyFee: 50,
   });
+
+  /** Token explícito evita corrida em que o fetch interno usa a anon key como Bearer (401 no gateway). */
+  async function edgeFunctionHeaders(): Promise<Record<string, string>> {
+    const { data: { session: s } } = await supabase.auth.getSession();
+    if (!s?.access_token) {
+      throw new Error('Sessão expirada. Faça login novamente.');
+    }
+    return {
+      Authorization: `Bearer ${s.access_token}`,
+      'x-client-info': 'plataforma-subcontas',
+    };
+  }
 
   async function loadSubaccounts(appSource?: App[]) {
     const { data, error } = await supabase
@@ -123,13 +148,14 @@ export default function App() {
     const nextOffset = reset ? 0 : asaasOffset;
     setAsaasLoading(true);
     try {
+      const headers = await edgeFunctionHeaders();
       const { data, error } = await supabase.functions.invoke('list-asaas-subaccounts', {
         body: { environment: env, offset: nextOffset, limit: 50 },
-        headers: { 'x-client-info': 'plataforma-subcontas' },
+        headers,
       });
       if (error) throw error;
       const result = (data as any)?.result;
-      const list = Array.isArray(result?.data) ? result.data : [];
+      const list = (Array.isArray(result?.data) ? result.data : []) as AsaasAccountRow[];
       const hasMore = Boolean(result?.hasMore);
       setAsaasHasMore(hasMore);
       setAsaasOffset(nextOffset + (result?.limit ?? list.length ?? 0));
@@ -227,11 +253,10 @@ export default function App() {
         monthlyFeeCents: Math.round(Number(form.monthlyFee) * 100),
       };
 
+      const fnHeaders = await edgeFunctionHeaders();
       const { data: fnData, error: fnError } = await supabase.functions.invoke('create-subaccount', {
         body,
-        headers: {
-          'x-client-info': 'plataforma-subcontas',
-        },
+        headers: fnHeaders,
       });
 
       if (fnError) {
@@ -281,18 +306,20 @@ export default function App() {
 
     setMessage(null);
     try {
+      const delHeaders = await edgeFunctionHeaders();
       const { error } = await supabase.functions.invoke('delete-subaccount', {
         body: { id, mode: 'asaas_and_db', removeReason: 'Liberar dados' },
-        headers: { 'x-client-info': 'plataforma-subcontas' },
+        headers: delHeaders,
       });
       if (error) {
         const fallback = confirm(
           `Falhou excluir na Asaas.\n\n${error.message}\n\nQuer remover SOMENTE do Supabase (db_only)?`
         );
         if (!fallback) throw error;
+        const dbHeaders = await edgeFunctionHeaders();
         const { error: dbOnlyErr } = await supabase.functions.invoke('delete-subaccount', {
           body: { id, mode: 'db_only' },
-          headers: { 'x-client-info': 'plataforma-subcontas' },
+          headers: dbHeaders,
         });
         if (dbOnlyErr) throw dbOnlyErr;
       }
@@ -374,6 +401,16 @@ export default function App() {
       receitaMensal: brl.format(totalReceita / 100),
     };
   }, [subaccounts]);
+
+  /** A listagem do Asaas não devolve apiKey; cruzamos com o que foi salvo no Supabase ao criar pelo painel. */
+  const subaccountSecretsByAsaasId = useMemo(() => {
+    const m = new Map<string, { api_key: string; wallet_id: string | null }>();
+    for (const s of subaccounts) {
+      if (s.environment !== asaasEnvironment) continue;
+      m.set(s.asaas_subaccount_id, { api_key: s.api_key, wallet_id: s.asaas_wallet_id });
+    }
+    return m;
+  }, [subaccounts, asaasEnvironment]);
 
   const tabs: { id: Tab; label: string }[] = [
     { id: 'list', label: 'Dashboard' },
@@ -469,7 +506,19 @@ export default function App() {
             </div>
             <div className="mt-3 flex gap-2 overflow-x-auto pb-1 lg:hidden">
               {tabs.map((item) => (
-                <button key={item.id} type="button" onClick={() => setTab(item.id)} className={`rounded-lg px-3 py-2 text-sm ${tab === item.id ? 'bg-brand-600 text-white' : 'bg-slate-200 text-slate-700'}`}>
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => {
+                    setTab(item.id);
+                    if (item.id === 'asaas') {
+                      setAsaasSubaccounts([]);
+                      setAsaasOffset(0);
+                      void loadAsaasSubaccounts({ reset: true, environment: asaasEnvironment });
+                    }
+                  }}
+                  className={`rounded-lg px-3 py-2 text-sm ${tab === item.id ? 'bg-brand-600 text-white' : 'bg-slate-200 text-slate-700'}`}
+                >
                   {item.label}
                 </button>
               ))}
@@ -519,7 +568,8 @@ export default function App() {
                           <th className="px-4 py-3 text-left font-medium">Cliente</th>
                           <th className="px-4 py-3 text-left font-medium">App</th>
                           <th className="px-4 py-3 text-left font-medium">Ambiente</th>
-                          <th className="px-4 py-3 text-left font-medium">ID</th>
+                          <th className="px-4 py-3 text-left font-medium">ID Asaas</th>
+                          <th className="px-4 py-3 text-left font-medium">Wallet</th>
                           <th className="px-4 py-3 text-left font-medium">Chave API</th>
                           <th className="px-4 py-3 text-left font-medium">Mensalidade</th>
                           <th className="px-4 py-3 text-left font-medium">Ações</th>
@@ -527,7 +577,7 @@ export default function App() {
                       </thead>
                       <tbody>
                         {subaccounts.length === 0 ? (
-                          <tr><td colSpan={7} className="px-4 py-8 text-center text-slate-500">Nenhuma subconta ainda.</td></tr>
+                          <tr><td colSpan={8} className="px-4 py-8 text-center text-slate-500">Nenhuma subconta ainda.</td></tr>
                         ) : (
                           subaccounts.map((s) => (
                             <tr key={s.id} className="border-t border-slate-100">
@@ -541,6 +591,15 @@ export default function App() {
                               </td>
                               <td className="px-4 py-3 font-mono text-xs">
                                 <button type="button" className="text-brand-700 hover:underline" onClick={() => copyToClipboard(s.asaas_subaccount_id)}>{s.asaas_subaccount_id.slice(0, 8)}...</button>
+                              </td>
+                              <td className="px-4 py-3 font-mono text-xs max-w-[140px]">
+                                {s.asaas_wallet_id ? (
+                                  <button type="button" className="block truncate text-left text-brand-700 hover:underline" title={s.asaas_wallet_id} onClick={() => copyToClipboard(s.asaas_wallet_id!)}>
+                                    {s.asaas_wallet_id.slice(0, 10)}…
+                                  </button>
+                                ) : (
+                                  <span className="text-slate-400">—</span>
+                                )}
                               </td>
                               <td className="px-4 py-3 font-mono text-xs">
                                 <button type="button" className="text-brand-700 hover:underline" onClick={() => copyToClipboard(s.api_key)}>{maskKey(s.api_key)}</button>
@@ -569,14 +628,17 @@ export default function App() {
               <div className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
                 <h2 className="text-lg font-semibold text-slate-900">Apps / Plataformas</h2>
                 <p className="mt-1 text-sm text-slate-600">Código único para vincular subcontas ao seu sistema.</p>
-                <ul className="mt-4 space-y-2">
+                <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                   {apps.map((a) => (
-                    <li key={a.id} className="flex items-center gap-3 rounded-lg bg-slate-50 px-3 py-2">
-                      <span className="font-mono font-medium text-brand-700">{a.code}</span>
-                      <span className="text-slate-700">{a.name}</span>
-                    </li>
+                    <div
+                      key={a.id}
+                      className="flex flex-col rounded-xl border border-slate-200 bg-gradient-to-br from-white to-slate-50 p-4 shadow-sm transition hover:border-brand-300 hover:shadow-md"
+                    >
+                      <span className="inline-flex w-fit rounded-lg bg-brand-600/10 px-2.5 py-1 font-mono text-xs font-semibold text-brand-800">{a.code}</span>
+                      <p className="mt-3 text-sm font-medium leading-snug text-slate-900">{a.name}</p>
+                    </div>
                   ))}
-                </ul>
+                </div>
               </div>
             )}
 
@@ -616,12 +678,17 @@ export default function App() {
 
             {tab === 'asaas' && (
               <div className="rounded-2xl bg-white shadow-sm ring-1 ring-slate-200 overflow-hidden">
-                <div className="border-b border-slate-200 px-5 py-4 flex flex-wrap items-center justify-between gap-2">
-                  <h2 className="text-lg font-semibold text-slate-900">Subcontas no Asaas</h2>
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm text-slate-600">Ambiente</span>
+                <div className="flex flex-wrap items-start justify-between gap-4 border-b border-slate-200 bg-gradient-to-r from-slate-50 to-white px-5 py-4">
+                  <div>
+                    <h2 className="text-lg font-semibold text-slate-900">Subcontas no Asaas</h2>
+                    <p className="mt-1 max-w-2xl text-sm text-slate-600">
+                      Lista em tempo real da API Asaas. A <span className="font-medium text-slate-800">chave API</span> aparece nos cards somente quando a subconta foi criada por este painel — o endpoint de listagem do Asaas não devolve a chave.
+                    </p>
+                  </div>
+                  <div className="flex flex-col items-stretch gap-1 sm:items-end">
+                    <span className="text-xs font-medium text-slate-500">Ambiente</span>
                     <select
-                      className="input !py-2"
+                      className="input !py-2 min-w-[160px]"
                       value={asaasEnvironment}
                       onChange={(e) => {
                         const env = e.target.value as 'sandbox' | 'production';
@@ -637,40 +704,123 @@ export default function App() {
                     </select>
                   </div>
                 </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead className="bg-slate-50 text-slate-600">
-                      <tr>
-                        <th className="px-4 py-3 text-left font-medium">Nome</th>
-                        <th className="px-4 py-3 text-left font-medium">E-mail</th>
-                        <th className="px-4 py-3 text-left font-medium">CPF/CNPJ</th>
-                        <th className="px-4 py-3 text-left font-medium">Wallet</th>
-                        <th className="px-4 py-3 text-left font-medium">ID</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {asaasSubaccounts.length === 0 && !asaasLoading ? (
-                        <tr><td colSpan={5} className="px-4 py-8 text-center text-slate-500">Nenhuma subconta retornada.</td></tr>
-                      ) : (
-                        asaasSubaccounts.map((a) => (
-                          <tr key={a.id} className="border-t border-slate-100">
-                            <td className="px-4 py-3">{a.name ?? '-'}</td>
-                            <td className="px-4 py-3 text-slate-600">{a.email ?? '-'}</td>
-                            <td className="px-4 py-3 font-mono text-xs">{a.cpfCnpj ?? '-'}</td>
-                            <td className="px-4 py-3 font-mono text-xs">{a.walletId ?? '-'}</td>
-                            <td className="px-4 py-3 font-mono text-xs">
-                              <button type="button" className="text-brand-700 hover:underline" onClick={() => copyToClipboard(a.id)}>{String(a.id).slice(0, 8)}...</button>
-                            </td>
-                          </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
+
+                <div className="border-b border-slate-100 bg-slate-50/90 px-4 py-2.5 text-xs text-slate-600 md:px-6">
+                  <span className="font-semibold text-slate-800">{asaasSubaccounts.length}</span> conta(s) exibida(s)
+                  {asaasHasMore ? ' · há mais ao carregar' : ''} ·{' '}
+                  <span className="text-slate-500">{asaasEnvironment === 'production' ? 'Produção' : 'Sandbox'}</span>
                 </div>
-                <div className="flex items-center justify-between px-5 py-4">
-                  <p className="text-sm text-slate-500">{asaasLoading ? 'Carregando...' : asaasHasMore ? 'Há mais resultados.' : 'Fim da lista.'}</p>
+
+                <div className="p-4 md:p-6">
+                  {asaasLoading && asaasSubaccounts.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center gap-3 py-20 text-slate-500">
+                      <div
+                        className="h-9 w-9 animate-spin rounded-full border-2 border-brand-600 border-t-transparent"
+                        aria-hidden
+                      />
+                      <p className="text-sm">Carregando contas…</p>
+                    </div>
+                  ) : asaasSubaccounts.length === 0 ? (
+                    <p className="py-16 text-center text-sm text-slate-500">Nenhuma subconta retornada para este ambiente.</p>
+                  ) : (
+                    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                      {asaasSubaccounts.map((a) => {
+                        const db = subaccountSecretsByAsaasId.get(a.id);
+                        const wallet = a.walletId ?? db?.wallet_id ?? null;
+                        const apiKey = db?.api_key ?? null;
+                        return (
+                          <article
+                            key={a.id}
+                            className="flex flex-col rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-brand-200 hover:shadow-md"
+                          >
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="min-w-0">
+                                <h3 className="truncate text-base font-semibold text-slate-900">{a.name ?? 'Sem nome'}</h3>
+                                <p className="mt-0.5 truncate text-sm text-slate-600">{a.email ?? '—'}</p>
+                              </div>
+                              {(a.companyType || a.personType) && (
+                                <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-600">
+                                  {a.companyType ?? a.personType}
+                                </span>
+                              )}
+                            </div>
+                            <dl className="mt-4 grid gap-2 text-xs">
+                              <div className="rounded-lg bg-slate-50 px-3 py-2">
+                                <dt className="font-semibold uppercase tracking-wide text-slate-500">CPF/CNPJ</dt>
+                                <dd className="mt-1 font-mono text-slate-800">{a.cpfCnpj ?? '—'}</dd>
+                              </div>
+                              <div className="rounded-lg bg-slate-50 px-3 py-2">
+                                <dt className="font-semibold uppercase tracking-wide text-slate-500">Wallet</dt>
+                                <dd className="mt-1 flex items-center justify-between gap-2">
+                                  <span className="min-w-0 flex-1 truncate font-mono text-slate-800" title={wallet ?? undefined}>
+                                    {wallet ?? '—'}
+                                  </span>
+                                  {wallet ? (
+                                    <button
+                                      type="button"
+                                      className="shrink-0 rounded-md bg-white px-2 py-1 text-[11px] font-medium text-brand-700 ring-1 ring-slate-200 hover:bg-brand-50"
+                                      onClick={() => copyToClipboard(wallet)}
+                                    >
+                                      Copiar
+                                    </button>
+                                  ) : null}
+                                </dd>
+                              </div>
+                              <div className="rounded-lg bg-slate-50 px-3 py-2">
+                                <dt className="font-semibold uppercase tracking-wide text-slate-500">ID Asaas</dt>
+                                <dd className="mt-1 flex items-center justify-between gap-2">
+                                  <span className="min-w-0 flex-1 truncate font-mono text-[11px] text-slate-800">{a.id}</span>
+                                  <button
+                                    type="button"
+                                    className="shrink-0 rounded-md bg-white px-2 py-1 text-[11px] font-medium text-brand-700 ring-1 ring-slate-200 hover:bg-brand-50"
+                                    onClick={() => copyToClipboard(a.id)}
+                                  >
+                                    Copiar
+                                  </button>
+                                </dd>
+                              </div>
+                              <div className="rounded-lg bg-slate-50 px-3 py-2">
+                                <dt className="flex flex-wrap items-center justify-between gap-2">
+                                  <span className="font-semibold uppercase tracking-wide text-slate-500">Chave API</span>
+                                  {apiKey ? (
+                                    <span className="rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-800">Salva no painel</span>
+                                  ) : (
+                                    <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800">Fora do painel</span>
+                                  )}
+                                </dt>
+                                <dd className="mt-1 flex items-start justify-between gap-2">
+                                  {apiKey ? (
+                                    <>
+                                      <span className="min-w-0 flex-1 break-all font-mono text-[11px] text-slate-800">{maskKey(apiKey)}</span>
+                                      <button
+                                        type="button"
+                                        className="shrink-0 rounded-md bg-white px-2 py-1 text-[11px] font-medium text-brand-700 ring-1 ring-slate-200 hover:bg-brand-50"
+                                        onClick={() => copyToClipboard(apiKey)}
+                                      >
+                                        Copiar
+                                      </button>
+                                    </>
+                                  ) : (
+                                    <span className="text-[11px] leading-relaxed text-slate-500">
+                                      Só aparece aqui se você criou a subconta neste painel. Contas criadas só no Asaas não têm chave nesta base.
+                                    </span>
+                                  )}
+                                </dd>
+                              </div>
+                            </dl>
+                          </article>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 px-5 py-4">
+                  <p className="text-sm text-slate-500">
+                    {asaasLoading ? 'Carregando…' : asaasHasMore ? 'Há mais resultados na API.' : 'Fim da lista para este ambiente.'}
+                  </p>
                   <button type="button" className="btn-primary" disabled={!asaasHasMore || asaasLoading} onClick={() => void loadAsaasSubaccounts({ reset: false })}>
-                    {asaasLoading ? 'Carregando...' : 'Carregar mais'}
+                    {asaasLoading ? 'Carregando…' : 'Carregar mais'}
                   </button>
                 </div>
               </div>
