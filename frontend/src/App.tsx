@@ -744,119 +744,168 @@ export default function App() {
                   />
                 </section>
 
-                <section className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-lg shadow-slate-200/40 ring-1 ring-slate-200/50">
-                  <div className="flex flex-col gap-2 border-b border-slate-100 bg-gradient-to-r from-slate-50 via-white to-brand-50/30 px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-                    <div>
-                      <h2 className="text-lg font-semibold tracking-tight text-slate-900">Subcontas recentes</h2>
-                      <p className="mt-1 text-sm text-slate-500">Cliente, ambiente, IDs e ações · scroll horizontal em telas pequenas</p>
+                <section className="relative overflow-hidden rounded-2xl border border-slate-200/40 bg-white shadow-[0_22px_60px_-16px_rgba(15,23,42,0.12),0_0_0_1px_rgba(255,255,255,0.6)_inset]">
+                  <div
+                    className="pointer-events-none absolute -right-24 -top-24 h-56 w-56 rounded-full bg-gradient-to-br from-brand-400/20 via-sky-300/10 to-transparent blur-2xl"
+                    aria-hidden
+                  />
+                  <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/90 to-transparent" aria-hidden />
+
+                  <div className="relative border-b border-slate-200/50 bg-gradient-to-br from-slate-50/95 via-white to-slate-100/40 px-6 py-6 sm:px-8 sm:py-7">
+                    <div className="absolute left-0 top-0 h-1 w-full bg-gradient-to-r from-brand-500 via-sky-400 to-brand-600" aria-hidden />
+                    <div className="flex flex-col gap-5 pt-1 sm:flex-row sm:items-end sm:justify-between">
+                      <div className="min-w-0">
+                        <p className="text-[10px] font-bold uppercase tracking-[0.28em] text-brand-600">Base cadastral</p>
+                        <h2 className="mt-2 text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">Subcontas recentes</h2>
+                        <p className="mt-2 max-w-xl text-sm leading-relaxed text-slate-500">
+                          Visão consolidada das contas vinculadas aos apps. Toque nos trechos mascarados para copiar IDs e chaves.
+                        </p>
+                      </div>
+                      <div className="flex shrink-0 flex-wrap items-center gap-2 sm:flex-col sm:items-end sm:gap-2">
+                        <span className="inline-flex items-center gap-2 rounded-full border border-slate-200/80 bg-white/90 px-4 py-2 text-xs font-medium text-slate-600 shadow-sm backdrop-blur-sm">
+                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.6)]" aria-hidden />
+                          <span className="tabular-nums text-slate-900">{metrics.total}</span>
+                          <span className="text-slate-400">{metrics.total === 1 ? 'registro' : 'registros'}</span>
+                        </span>
+                      </div>
                     </div>
-                    <span className="inline-flex w-fit items-center rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-600 shadow-sm">
-                      {metrics.total} {metrics.total === 1 ? 'registro' : 'registros'}
-                    </span>
                   </div>
-                  <div className="overflow-x-auto">
-                    <table className="w-full min-w-[920px] border-collapse text-sm">
-                      <thead>
-                        <tr className="border-b border-slate-200 bg-slate-50/95 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-                          <th className="whitespace-nowrap px-5 py-3.5 pl-6">Cliente</th>
-                          <th className="whitespace-nowrap px-4 py-3.5">App</th>
-                          <th className="whitespace-nowrap px-4 py-3.5">Ambiente</th>
-                          <th className="whitespace-nowrap px-4 py-3.5">ID Asaas</th>
-                          <th className="whitespace-nowrap px-4 py-3.5">Wallet</th>
-                          <th className="whitespace-nowrap px-4 py-3.5">Chave API</th>
-                          <th className="whitespace-nowrap px-4 py-3.5">Mensalidade</th>
-                          <th className="whitespace-nowrap px-5 py-3.5 pr-6 text-right">Ações</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100">
-                        {subaccounts.length === 0 ? (
-                          <tr>
-                            <td colSpan={8} className="px-6 py-16 text-center">
-                              <p className="text-sm font-medium text-slate-600">Nenhuma subconta ainda</p>
-                              <p className="mt-1 text-xs text-slate-500">Crie a primeira pela aba &quot;Nova Subconta&quot;.</p>
-                            </td>
-                          </tr>
-                        ) : (
-                          subaccounts.map((s) => {
-                            const initials = (s.name || s.email || '?')
-                              .split(/\s+/)
-                              .map((w) => w[0])
-                              .join('')
-                              .slice(0, 2)
-                              .toUpperCase();
-                            return (
-                              <tr key={s.id} className="transition-colors hover:bg-brand-50/50">
-                                <td className="px-5 py-4 pl-6">
-                                  <div className="flex items-center gap-3">
-                                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-slate-100 to-slate-200 text-xs font-bold text-slate-600 ring-1 ring-slate-200/80">
-                                      {initials}
-                                    </span>
-                                    <div className="min-w-0">
-                                      <div className="truncate font-medium text-slate-900">{s.name || '—'}</div>
-                                      <div className="truncate text-xs text-slate-500">{s.email}</div>
-                                    </div>
+
+                  <div className="relative bg-gradient-to-b from-slate-50/90 to-slate-50/30 p-2 sm:p-3">
+                    <div className="overflow-hidden rounded-xl border border-slate-200/50 bg-white shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]">
+                      <div className="overflow-x-auto">
+                        <table className="w-full min-w-[920px] border-collapse text-sm">
+                          <thead>
+                            <tr className="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 text-left text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">
+                              <th className="whitespace-nowrap px-5 py-4 pl-7 font-medium">Cliente</th>
+                              <th className="whitespace-nowrap px-4 py-4 font-medium">App</th>
+                              <th className="whitespace-nowrap px-4 py-4 font-medium">Ambiente</th>
+                              <th className="whitespace-nowrap px-4 py-4 font-medium">ID Asaas</th>
+                              <th className="whitespace-nowrap px-4 py-4 font-medium">Wallet</th>
+                              <th className="whitespace-nowrap px-4 py-4 font-medium">Chave API</th>
+                              <th className="whitespace-nowrap px-4 py-4 font-medium">Mensalidade</th>
+                              <th className="whitespace-nowrap px-5 py-4 pr-7 text-right font-medium">Ações</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {subaccounts.length === 0 ? (
+                              <tr>
+                                <td colSpan={8} className="px-8 py-20 text-center">
+                                  <div className="mx-auto max-w-sm rounded-2xl border border-dashed border-slate-200 bg-slate-50/50 px-6 py-8">
+                                    <p className="text-sm font-semibold text-slate-700">Nenhuma subconta ainda</p>
+                                    <p className="mt-2 text-xs leading-relaxed text-slate-500">
+                                      Comece pelo menu <span className="font-medium text-slate-700">Nova Subconta</span> para criar a primeira integração Asaas.
+                                    </p>
                                   </div>
                                 </td>
-                                <td className="px-4 py-4 font-mono text-xs font-semibold text-brand-700">{s.apps?.code ?? '—'}</td>
-                                <td className="px-4 py-4">
-                                  <span
-                                    className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${
-                                      s.environment === 'production'
-                                        ? 'bg-amber-100 text-amber-800 ring-1 ring-amber-200/80'
-                                        : 'bg-slate-100 text-slate-700 ring-1 ring-slate-200/80'
+                              </tr>
+                            ) : (
+                              subaccounts.map((s, idx) => {
+                                const initials = (s.name || s.email || '?')
+                                  .split(/\s+/)
+                                  .map((w) => w[0])
+                                  .filter(Boolean)
+                                  .join('')
+                                  .slice(0, 2)
+                                  .toUpperCase();
+                                return (
+                                  <tr
+                                    key={s.id}
+                                    className={`border-b border-slate-100/90 transition-colors duration-200 hover:bg-brand-50/55 ${
+                                      idx % 2 === 1 ? 'bg-slate-50/35' : 'bg-white'
                                     }`}
                                   >
-                                    {s.environment}
-                                  </span>
-                                </td>
-                                <td className="px-4 py-4 font-mono text-xs">
-                                  <button
-                                    type="button"
-                                    className="rounded-lg border border-transparent px-1.5 py-0.5 text-brand-700 hover:border-brand-200 hover:bg-brand-50"
-                                    onClick={() => copyToClipboard(s.asaas_subaccount_id)}
-                                  >
-                                    {s.asaas_subaccount_id.slice(0, 8)}…
-                                  </button>
-                                </td>
-                                <td className="max-w-[140px] px-4 py-4 font-mono text-xs">
-                                  {s.asaas_wallet_id ? (
-                                    <button
-                                      type="button"
-                                      className="block w-full truncate rounded-lg border border-transparent text-left text-brand-700 hover:border-brand-200 hover:bg-brand-50"
-                                      title={s.asaas_wallet_id}
-                                      onClick={() => copyToClipboard(s.asaas_wallet_id!)}
-                                    >
-                                      {s.asaas_wallet_id.slice(0, 10)}…
-                                    </button>
-                                  ) : (
-                                    <span className="text-slate-400">—</span>
-                                  )}
-                                </td>
-                                <td className="px-4 py-4 font-mono text-xs">
-                                  <button
-                                    type="button"
-                                    className="rounded-lg border border-transparent px-1.5 py-0.5 text-brand-700 hover:border-brand-200 hover:bg-brand-50"
-                                    onClick={() => copyToClipboard(s.api_key)}
-                                  >
-                                    {maskKey(s.api_key)}
-                                  </button>
-                                </td>
-                                <td className="px-4 py-4 text-sm font-medium tabular-nums text-slate-800">{formatMoneyCents(s.monthly_fee_cents)}</td>
-                                <td className="px-5 py-4 pr-6 text-right">
-                                  <button
-                                    type="button"
-                                    className="inline-flex items-center rounded-lg border border-red-200 bg-red-50 px-2.5 py-1.5 text-xs font-semibold text-red-700 transition hover:bg-red-100"
-                                    onClick={() => handleDeleteSubaccount(s.id, s.name || s.email)}
-                                  >
-                                    Excluir
-                                  </button>
-                                </td>
-                              </tr>
-                            );
-                          })
-                        )}
-                      </tbody>
-                    </table>
+                                    <td className="px-5 py-4 pl-7 align-middle">
+                                      <div className="flex items-center gap-3.5">
+                                        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-slate-700 to-slate-900 text-xs font-bold tracking-wide text-white shadow-lg shadow-slate-900/25 ring-2 ring-white">
+                                          {initials}
+                                        </span>
+                                        <div className="min-w-0">
+                                          <div className="truncate font-semibold text-slate-900">{s.name || '—'}</div>
+                                          <div className="truncate text-xs text-slate-500">{s.email}</div>
+                                        </div>
+                                      </div>
+                                    </td>
+                                    <td className="px-4 py-4 align-middle font-mono text-xs font-bold tracking-wide text-brand-700">
+                                      {s.apps?.code ?? '—'}
+                                    </td>
+                                    <td className="px-4 py-4 align-middle">
+                                      <span
+                                        className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold tracking-wide ${
+                                          s.environment === 'production'
+                                            ? 'bg-amber-500/15 text-amber-900 ring-1 ring-amber-500/25'
+                                            : 'bg-slate-500/10 text-slate-700 ring-1 ring-slate-400/20'
+                                        }`}
+                                      >
+                                        {s.environment}
+                                      </span>
+                                    </td>
+                                    <td className="px-4 py-4 align-middle font-mono text-[11px]">
+                                      <button
+                                        type="button"
+                                        className="inline-flex max-w-full items-center gap-1.5 rounded-lg border border-slate-200/80 bg-slate-50/90 px-2.5 py-1.5 text-left font-medium text-slate-700 transition hover:border-brand-300 hover:bg-brand-50 hover:text-brand-900"
+                                        onClick={() => copyToClipboard(s.asaas_subaccount_id)}
+                                        title="Copiar ID Asaas"
+                                      >
+                                        <span className="truncate">{s.asaas_subaccount_id.slice(0, 10)}…</span>
+                                        <svg className="h-3.5 w-3.5 shrink-0 opacity-50" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" aria-hidden>
+                                          <path strokeLinecap="round" strokeLinejoin="round" d="M15.666 3.888A2.25 2.25 0 0013.5 2.25h-3c-1.03 0-1.9.693-2.166 1.638m7.332 0c.055.194.084.4.084.612v0a.75.75 0 01-.75.75H9a.75.75 0 01-.75-.75v0c0-.212.03-.418.084-.612m7.332 0c.646.049 1.288.11 1.927.184 1.1.128 1.907 1.08 1.907 2.185V19.5a2.25 2.25 0 01-2.25 2.25H6.75A2.25 2.25 0 014.5 19.5V6.257c0-1.108.806-2.057 1.907-2.185a48.208 48.208 0 011.927-.184" />
+                                        </svg>
+                                      </button>
+                                    </td>
+                                    <td className="max-w-[150px] px-4 py-4 align-middle font-mono text-[11px]">
+                                      {s.asaas_wallet_id ? (
+                                        <button
+                                          type="button"
+                                          className="inline-flex w-full max-w-full items-center gap-1.5 rounded-lg border border-slate-200/80 bg-slate-50/90 px-2.5 py-1.5 text-left font-medium text-slate-700 transition hover:border-brand-300 hover:bg-brand-50 hover:text-brand-900"
+                                          title="Copiar wallet"
+                                          onClick={() => copyToClipboard(s.asaas_wallet_id!)}
+                                        >
+                                          <span className="truncate">{s.asaas_wallet_id.slice(0, 10)}…</span>
+                                          <svg className="h-3.5 w-3.5 shrink-0 opacity-50" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" aria-hidden>
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="M15.666 3.888A2.25 2.25 0 0013.5 2.25h-3c-1.03 0-1.9.693-2.166 1.638m7.332 0c.055.194.084.4.084.612v0a.75.75 0 01-.75.75H9a.75.75 0 01-.75-.75v0c0-.212.03-.418.084-.612m7.332 0c.646.049 1.288.11 1.927.184 1.1.128 1.907 1.08 1.907 2.185V19.5a2.25 2.25 0 01-2.25 2.25H6.75A2.25 2.25 0 014.5 19.5V6.257c0-1.108.806-2.057 1.907-2.185a48.208 48.208 0 011.927-.184" />
+                                          </svg>
+                                        </button>
+                                      ) : (
+                                        <span className="text-slate-400">—</span>
+                                      )}
+                                    </td>
+                                    <td className="px-4 py-4 align-middle font-mono text-[11px]">
+                                      <button
+                                        type="button"
+                                        className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200/80 bg-slate-50/90 px-2.5 py-1.5 font-medium text-slate-700 transition hover:border-brand-300 hover:bg-brand-50 hover:text-brand-900"
+                                        title="Copiar chave API"
+                                        onClick={() => copyToClipboard(s.api_key)}
+                                      >
+                                        <span>{maskKey(s.api_key)}</span>
+                                        <svg className="h-3.5 w-3.5 shrink-0 opacity-50" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" aria-hidden>
+                                          <path strokeLinecap="round" strokeLinejoin="round" d="M15.666 3.888A2.25 2.25 0 0013.5 2.25h-3c-1.03 0-1.9.693-2.166 1.638m7.332 0c.055.194.084.4.084.612v0a.75.75 0 01-.75.75H9a.75.75 0 01-.75-.75v0c0-.212.03-.418.084-.612m7.332 0c.646.049 1.288.11 1.927.184 1.1.128 1.907 1.08 1.907 2.185V19.5a2.25 2.25 0 01-2.25 2.25H6.75A2.25 2.25 0 014.5 19.5V6.257c0-1.108.806-2.057 1.907-2.185a48.208 48.208 0 011.927-.184" />
+                                        </svg>
+                                      </button>
+                                    </td>
+                                    <td className="px-4 py-4 align-middle text-base font-semibold tabular-nums tracking-tight text-slate-900">
+                                      {formatMoneyCents(s.monthly_fee_cents)}
+                                    </td>
+                                    <td className="px-5 py-4 pr-7 text-right align-middle">
+                                      <button
+                                        type="button"
+                                        className="inline-flex items-center gap-1.5 rounded-full border border-red-200/90 bg-gradient-to-b from-red-50 to-red-100/80 px-3 py-1.5 text-xs font-semibold text-red-800 shadow-sm transition hover:border-red-300 hover:from-red-100 hover:to-red-50"
+                                        onClick={() => handleDeleteSubaccount(s.id, s.name || s.email)}
+                                      >
+                                        <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" aria-hidden>
+                                          <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
+                                        </svg>
+                                        Excluir
+                                      </button>
+                                    </td>
+                                  </tr>
+                                );
+                              })
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
                   </div>
                 </section>
               </div>
