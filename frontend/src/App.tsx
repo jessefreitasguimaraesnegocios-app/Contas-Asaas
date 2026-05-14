@@ -39,8 +39,6 @@ type Subaccount = {
   name: string | null;
   cpf_cnpj: string | null;
   status: string | null;
-  split_percent: number | string | null;
-  monthly_fee_cents: number | string | null;
   created_at: string;
   apps?: { code: string; name: string } | null;
 };
@@ -159,8 +157,6 @@ export default function App() {
     province: '',
     postalCode: '',
     incomeValue: 25000,
-    splitPercent: 10,
-    monthlyFee: 50,
   });
 
   /** Token explícito evita corrida em que o fetch interno usa a anon key como Bearer (401 no gateway). */
@@ -179,7 +175,7 @@ export default function App() {
     const { data, error } = await supabase
       .from('asaas_subaccounts')
       .select(
-        'id, app_id, environment, asaas_subaccount_id, asaas_wallet_id, api_key, email, name, cpf_cnpj, status, split_percent, monthly_fee_cents, created_at, apps(code, name)'
+        'id, app_id, environment, asaas_subaccount_id, asaas_wallet_id, api_key, email, name, cpf_cnpj, status, created_at, apps(code, name)'
       )
       .order('created_at', { ascending: false });
     if (!error) {
@@ -190,7 +186,7 @@ export default function App() {
     // Fallback: if relational select fails, load base fields anyway.
     const { data: fallbackData, error: fallbackError } = await supabase
       .from('asaas_subaccounts')
-      .select('id, app_id, environment, asaas_subaccount_id, asaas_wallet_id, api_key, email, name, cpf_cnpj, status, split_percent, monthly_fee_cents, created_at')
+      .select('id, app_id, environment, asaas_subaccount_id, asaas_wallet_id, api_key, email, name, cpf_cnpj, status, created_at')
       .order('created_at', { ascending: false });
 
     if (fallbackError) {
@@ -344,8 +340,6 @@ export default function App() {
         province: form.province,
         postalCode: form.postalCode,
         incomeValue: form.incomeValue,
-        splitPercent: form.splitPercent,
-        monthlyFeeCents: Math.round(Number(form.monthlyFee) * 100),
       };
 
       const fnHeaders = await edgeFunctionHeaders();
@@ -384,15 +378,6 @@ export default function App() {
     return key.slice(0, 12) + '…' + key.slice(-6);
   }
 
-  function formatMoneyCents(value: string | number | null | undefined) {
-    const cents =
-      value == null
-        ? 0
-        : typeof value === 'string'
-          ? parseInt(value, 10) || 0
-          : Number(value) || 0;
-    return brl.format(cents / 100);
-  }
   async function handleDeleteSubaccount(id: string, label?: string) {
     const ok = confirm(
       `Confirma a exclusao desta subconta${label ? ` (${label})` : ''}?\n\n- Primeiro tenta excluir na Asaas (quando permitido)\n- Depois remove o registro do Supabase\n\nIsso pode ser irreversivel na Asaas.`
@@ -477,23 +462,12 @@ export default function App() {
     await supabase.auth.signOut();
   }
 
-  const brl = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
   const metrics = useMemo(() => {
-    const totalReceita = subaccounts.reduce((acc, item) => {
-      const cents =
-        item.monthly_fee_cents == null
-          ? 0
-          : typeof item.monthly_fee_cents === 'string'
-            ? parseInt(item.monthly_fee_cents, 10) || 0
-            : Number(item.monthly_fee_cents) || 0;
-      return acc + cents;
-    }, 0);
     return {
       total: subaccounts.length,
       appsAtivos: new Set(subaccounts.map((s) => s.app_id)).size,
       sandbox: subaccounts.filter((s) => s.environment === 'sandbox').length,
       production: subaccounts.filter((s) => s.environment === 'production').length,
-      receitaMensal: brl.format(totalReceita / 100),
     };
   }, [subaccounts]);
 
@@ -691,7 +665,7 @@ export default function App() {
                   </div>
                 </header>
 
-                <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+                <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                   <DashboardStatCard
                     label="Subcontas totais"
                     value={metrics.total}
@@ -699,16 +673,6 @@ export default function App() {
                     icon={
                       <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.75} stroke="currentColor" aria-hidden>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" />
-                      </svg>
-                    }
-                  />
-                  <DashboardStatCard
-                    label="Receita mensal"
-                    value={metrics.receitaMensal}
-                    gradientClass="from-emerald-500 to-teal-600"
-                    icon={
-                      <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.75} stroke="currentColor" aria-hidden>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v12m-3-2.818l.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
                     }
                   />
@@ -783,14 +747,13 @@ export default function App() {
                               <th className="whitespace-nowrap px-4 py-4 font-medium">ID Asaas</th>
                               <th className="whitespace-nowrap px-4 py-4 font-medium">Wallet</th>
                               <th className="whitespace-nowrap px-4 py-4 font-medium">Chave API</th>
-                              <th className="whitespace-nowrap px-4 py-4 font-medium">Mensalidade</th>
                               <th className="whitespace-nowrap px-5 py-4 pr-7 text-right font-medium">Ações</th>
                             </tr>
                           </thead>
                           <tbody>
                             {subaccounts.length === 0 ? (
                               <tr>
-                                <td colSpan={8} className="px-8 py-20 text-center">
+                                <td colSpan={7} className="px-8 py-20 text-center">
                                   <div className="mx-auto max-w-sm rounded-2xl border border-dashed border-slate-200 bg-slate-50/50 px-6 py-8">
                                     <p className="text-sm font-semibold text-slate-700">Nenhuma subconta ainda</p>
                                     <p className="mt-2 text-xs leading-relaxed text-slate-500">
@@ -883,9 +846,6 @@ export default function App() {
                                         </svg>
                                       </button>
                                     </td>
-                                    <td className="px-4 py-4 align-middle text-base font-semibold tabular-nums tracking-tight text-slate-900">
-                                      {formatMoneyCents(s.monthly_fee_cents)}
-                                    </td>
                                     <td className="px-5 py-4 pr-7 text-right align-middle">
                                       <button
                                         type="button"
@@ -956,8 +916,6 @@ export default function App() {
                   <div><label className="label">Número *</label><input className="input" value={form.addressNumber} onChange={(e) => setForm({ ...form, addressNumber: e.target.value })} required /></div>
                   <div><label className="label">Complemento</label><input className="input" value={form.complement} onChange={(e) => setForm({ ...form, complement: e.target.value })} /></div>
                   <div><label className="label">Renda mensal</label><input type="number" className="input" value={form.incomeValue} onChange={(e) => setForm({ ...form, incomeValue: Number(e.target.value) })} /></div>
-                  <div><label className="label">Split (%)</label><input type="number" className="input" value={form.splitPercent} min={0} max={100} step={0.1} onChange={(e) => setForm({ ...form, splitPercent: Number(e.target.value) })} /></div>
-                  <div><label className="label">Mensalidade (R$)</label><input type="number" className="input" value={form.monthlyFee} min={0} step={0.01} onChange={(e) => setForm({ ...form, monthlyFee: Number(e.target.value) })} /></div>
                   <div className="flex items-end justify-end md:col-span-2"><button type="submit" className="btn-primary" disabled={creating}>{creating ? 'Criando...' : 'Criar subconta'}</button></div>
                 </form>
               </div>
