@@ -127,7 +127,7 @@ export default function App() {
   const [apps, setApps] = useState<App[]>([]);
   const [subaccounts, setSubaccounts] = useState<Subaccount[]>([]);
   const [asaasLoading, setAsaasLoading] = useState(false);
-  const [asaasEnvironment, setAsaasEnvironment] = useState<'sandbox' | 'production'>('sandbox');
+  const [asaasEnvironment, setAsaasEnvironment] = useState<'sandbox' | 'production'>('production');
   const [asaasOffset, setAsaasOffset] = useState(0);
   const [asaasHasMore, setAsaasHasMore] = useState(false);
   const [asaasSubaccounts, setAsaasSubaccounts] = useState<AsaasAccountRow[]>([]);
@@ -142,7 +142,7 @@ export default function App() {
 
   const [form, setForm] = useState({
     app_id: '',
-    environment: 'sandbox',
+    environment: 'production',
     name: '',
     email: '',
     loginEmail: '',
@@ -894,7 +894,7 @@ export default function App() {
                 <h2 className="text-lg font-semibold text-slate-900">Criar nova subconta</h2>
                 <form onSubmit={handleCreate} className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2">
                   <div><label className="label">App *</label><select className="input" value={form.app_id} onChange={(e) => setForm({ ...form, app_id: e.target.value })} required><option value="">Selecione</option>{apps.map((a) => (<option key={a.id} value={a.id}>{a.code} - {a.name}</option>))}</select></div>
-                  <div><label className="label">Ambiente *</label><select className="input" value={form.environment} onChange={(e) => setForm({ ...form, environment: e.target.value })}><option value="sandbox">Sandbox</option><option value="production">Produção</option></select></div>
+                  <div><label className="label">Ambiente *</label><select className="input" value={form.environment} onChange={(e) => setForm({ ...form, environment: e.target.value })}><option value="production">Produção</option><option value="sandbox">Sandbox</option></select></div>
                   <div><label className="label">Nome *</label><input className="input" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required /></div>
                   <div><label className="label">E-mail *</label><input type="email" className="input" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} required /></div>
                   <div><label className="label">E-mail de login</label><input type="email" className="input" value={form.loginEmail} onChange={(e) => setForm({ ...form, loginEmail: e.target.value })} /></div>
@@ -944,8 +944,8 @@ export default function App() {
                         void loadAsaasSubaccounts({ reset: true, environment: env });
                       }}
                     >
-                      <option value="sandbox">Sandbox</option>
                       <option value="production">Produção</option>
+                      <option value="sandbox">Sandbox</option>
                     </select>
                   </div>
                 </div>
