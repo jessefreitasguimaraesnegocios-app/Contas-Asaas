@@ -178,6 +178,18 @@ export default function App() {
     }
   }
 
+  /** Garante MANICURE / Sistema de Manicure em `public.apps` (idempotente; cobre DB sem migration aplicada). */
+  async function ensureManicureAppInDb(currentList: App[]): Promise<App[]> {
+    if (currentList.some((a) => a.code === 'MANICURE')) return currentList;
+    const { error: insErr } = await supabase.from('apps').insert({ code: 'MANICURE', name: 'Sistema de Manicure' });
+    if (insErr && insErr.code !== '23505') {
+      console.warn('[apps] insert MANICURE:', insErr.message);
+    }
+    const { data: refreshed, error: refErr } = await supabase.from('apps').select('id, code, name').order('code');
+    if (refErr || !refreshed?.length) return currentList;
+    return refreshed as App[];
+  }
+
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session: s } }) => {
       setSession(s);
@@ -202,7 +214,8 @@ export default function App() {
       if (appsError) {
         setMessage({ type: 'err', text: `Erro ao carregar apps: ${appsError.message}` });
       }
-      const appsList = (appsData as App[]) || [];
+      let appsList = (appsData as App[]) || [];
+      appsList = await ensureManicureAppInDb(appsList);
       setApps(appsList);
       await loadSubaccounts(appsList);
       setLoading(false);
