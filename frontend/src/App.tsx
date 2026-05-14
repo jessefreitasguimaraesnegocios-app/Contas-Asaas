@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from './lib/supabase';
 import {
@@ -86,6 +86,38 @@ function SidebarNavIcon({ id, className }: { id: Tab; className: string }) {
     default:
       return null;
   }
+}
+
+function DashboardStatCard({
+  label,
+  value,
+  gradientClass,
+  icon,
+}: {
+  label: string;
+  value: ReactNode;
+  gradientClass: string;
+  icon: ReactNode;
+}) {
+  return (
+    <div className="group relative overflow-hidden rounded-2xl border border-slate-200/90 bg-white p-5 shadow-sm shadow-slate-200/50 transition duration-300 hover:-translate-y-0.5 hover:border-brand-200/70 hover:shadow-lg hover:shadow-brand-500/10">
+      <div
+        className={`pointer-events-none absolute -right-8 -top-8 h-24 w-24 rounded-full bg-gradient-to-br opacity-[0.07] transition-opacity group-hover:opacity-[0.12] ${gradientClass}`}
+        aria-hidden
+      />
+      <div className="relative flex items-start gap-4">
+        <div
+          className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br text-white shadow-md ${gradientClass}`}
+        >
+          {icon}
+        </div>
+        <div className="min-w-0 flex-1 pt-0.5">
+          <p className="text-xs font-medium uppercase tracking-wide text-slate-500">{label}</p>
+          <p className="mt-1.5 text-2xl font-bold tabular-nums tracking-tight text-slate-900">{value}</p>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 export default function App() {
@@ -627,97 +659,201 @@ export default function App() {
             </div>
           </header>
 
-          <main className="p-4 md:p-8">
+          <main className="relative mx-auto w-full max-w-6xl flex-1 px-3 py-5 sm:px-5 md:px-6 md:py-8 lg:px-8">
             {message && (
-              <div className={`mb-4 rounded-xl px-4 py-3 ${message.type === 'ok' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                {message.text}
+              <div
+                className={`mb-6 flex items-start gap-3 rounded-2xl border px-4 py-3.5 text-sm shadow-sm ${
+                  message.type === 'ok'
+                    ? 'border-emerald-200/80 bg-emerald-50/90 text-emerald-900'
+                    : 'border-red-200/80 bg-red-50/90 text-red-900'
+                }`}
+              >
+                <span className="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white/80 text-xs font-bold shadow-sm">
+                  {message.type === 'ok' ? '✓' : '!'}
+                </span>
+                <span className="min-w-0 leading-relaxed">{message.text}</span>
               </div>
             )}
 
             {tab === 'list' && (
-              <div className="space-y-4">
-                <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-                  <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
-                    <p className="text-xs text-slate-500">Subcontas totais</p>
-                    <p className="mt-2 text-2xl font-semibold text-slate-900">{metrics.total}</p>
+              <div className="space-y-8">
+                <header className="flex flex-col gap-1 border-b border-slate-200/80 pb-6 sm:flex-row sm:items-end sm:justify-between">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand-600">Dashboard</p>
+                    <h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-900 md:text-3xl">Visão geral</h1>
+                    <p className="mt-2 max-w-xl text-sm leading-relaxed text-slate-600">
+                      Indicadores do cadastro e acesso rápido às subcontas vinculadas aos seus apps.
+                    </p>
                   </div>
-                  <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
-                    <p className="text-xs text-slate-500">Receita mensal</p>
-                    <p className="mt-2 text-2xl font-semibold text-slate-900">{metrics.receitaMensal}</p>
+                  <div className="mt-3 rounded-xl border border-slate-200/80 bg-white/80 px-4 py-2.5 text-right shadow-sm backdrop-blur-sm sm:mt-0">
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Registros</p>
+                    <p className="text-lg font-bold tabular-nums text-slate-900">{metrics.total}</p>
                   </div>
-                  <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
-                    <p className="text-xs text-slate-500">Apps ativos</p>
-                    <p className="mt-2 text-2xl font-semibold text-slate-900">{metrics.appsAtivos}</p>
-                  </div>
-                  <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
-                    <p className="text-xs text-slate-500">Sandbox</p>
-                    <p className="mt-2 text-2xl font-semibold text-slate-900">{metrics.sandbox}</p>
-                  </div>
-                  <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
-                    <p className="text-xs text-slate-500">Produção</p>
-                    <p className="mt-2 text-2xl font-semibold text-slate-900">{metrics.production}</p>
-                  </div>
+                </header>
+
+                <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+                  <DashboardStatCard
+                    label="Subcontas totais"
+                    value={metrics.total}
+                    gradientClass="from-slate-600 to-slate-800"
+                    icon={
+                      <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.75} stroke="currentColor" aria-hidden>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" />
+                      </svg>
+                    }
+                  />
+                  <DashboardStatCard
+                    label="Receita mensal"
+                    value={metrics.receitaMensal}
+                    gradientClass="from-emerald-500 to-teal-600"
+                    icon={
+                      <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.75} stroke="currentColor" aria-hidden>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v12m-3-2.818l.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    }
+                  />
+                  <DashboardStatCard
+                    label="Apps ativos"
+                    value={metrics.appsAtivos}
+                    gradientClass="from-sky-500 to-brand-600"
+                    icon={
+                      <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.75} stroke="currentColor" aria-hidden>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 6.75A.75.75 0 016.75 6h10.5a.75.75 0 01.75.75v10.5a.75.75 0 01-.75.75H6.75a.75.75 0 01-.75-.75V6.75zM6.75 4.5h10.5A2.25 2.25 0 0119.5 6.75v10.5a2.25 2.25 0 01-2.25 2.25H6.75a2.25 2.25 0 01-2.25-2.25V6.75A2.25 2.25 0 016.75 4.5z" />
+                      </svg>
+                    }
+                  />
+                  <DashboardStatCard
+                    label="Sandbox"
+                    value={metrics.sandbox}
+                    gradientClass="from-violet-500 to-purple-600"
+                    icon={
+                      <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.75} stroke="currentColor" aria-hidden>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 15a2.25 2.25 0 002.25 2.25H21a.75.75 0 00.75-.75v-4.5m-15 3.75h15m-16.5-3.75V6.75a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 6.75v4.5M3.75 21h16.5a1.5 1.5 0 001.5-1.5v-3a1.5 1.5 0 00-1.5-1.5H3.75a1.5 1.5 0 00-1.5 1.5v3a1.5 1.5 0 001.5 1.5z" />
+                      </svg>
+                    }
+                  />
+                  <DashboardStatCard
+                    label="Produção"
+                    value={metrics.production}
+                    gradientClass="from-amber-500 to-orange-600"
+                    icon={
+                      <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.75} stroke="currentColor" aria-hidden>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M15.59 14.37a6 6 0 01-5.84 7.38v-4.8m5.84-2.58a14.98 14.98 0 006.16-12.12A14.98 14.98 0 009.631 8.41m5.96 5.96a14.926 14.926 0 01-5.841 2.58m-.119-8.54a6 6 0 00-7.381 5.84h4.8m2.581-5.84a14.927 14.927 0 00-2.58 5.84m2.699 2.7c-.103.021-.207.041-.311.06a15.09 15.09 0 01-2.448-2.448 14.9 14.9 0 01.06-.312m-2.24 2.39a4.493 4.493 0 00-1.757 4.306 4.493 4.493 0 004.306-1.758M16.5 9a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0z" />
+                      </svg>
+                    }
+                  />
                 </section>
 
-                <section className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200">
-                  <div className="border-b border-slate-200 px-5 py-4">
-                    <h2 className="text-lg font-semibold text-slate-900">Subcontas recentes</h2>
+                <section className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-lg shadow-slate-200/40 ring-1 ring-slate-200/50">
+                  <div className="flex flex-col gap-2 border-b border-slate-100 bg-gradient-to-r from-slate-50 via-white to-brand-50/30 px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+                    <div>
+                      <h2 className="text-lg font-semibold tracking-tight text-slate-900">Subcontas recentes</h2>
+                      <p className="mt-1 text-sm text-slate-500">Cliente, ambiente, IDs e ações · scroll horizontal em telas pequenas</p>
+                    </div>
+                    <span className="inline-flex w-fit items-center rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-600 shadow-sm">
+                      {metrics.total} {metrics.total === 1 ? 'registro' : 'registros'}
+                    </span>
                   </div>
                   <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead className="bg-slate-50 text-slate-600">
-                        <tr>
-                          <th className="px-4 py-3 text-left font-medium">Cliente</th>
-                          <th className="px-4 py-3 text-left font-medium">App</th>
-                          <th className="px-4 py-3 text-left font-medium">Ambiente</th>
-                          <th className="px-4 py-3 text-left font-medium">ID Asaas</th>
-                          <th className="px-4 py-3 text-left font-medium">Wallet</th>
-                          <th className="px-4 py-3 text-left font-medium">Chave API</th>
-                          <th className="px-4 py-3 text-left font-medium">Mensalidade</th>
-                          <th className="px-4 py-3 text-left font-medium">Ações</th>
+                    <table className="w-full min-w-[920px] border-collapse text-sm">
+                      <thead>
+                        <tr className="border-b border-slate-200 bg-slate-50/95 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                          <th className="whitespace-nowrap px-5 py-3.5 pl-6">Cliente</th>
+                          <th className="whitespace-nowrap px-4 py-3.5">App</th>
+                          <th className="whitespace-nowrap px-4 py-3.5">Ambiente</th>
+                          <th className="whitespace-nowrap px-4 py-3.5">ID Asaas</th>
+                          <th className="whitespace-nowrap px-4 py-3.5">Wallet</th>
+                          <th className="whitespace-nowrap px-4 py-3.5">Chave API</th>
+                          <th className="whitespace-nowrap px-4 py-3.5">Mensalidade</th>
+                          <th className="whitespace-nowrap px-5 py-3.5 pr-6 text-right">Ações</th>
                         </tr>
                       </thead>
-                      <tbody>
+                      <tbody className="divide-y divide-slate-100">
                         {subaccounts.length === 0 ? (
-                          <tr><td colSpan={8} className="px-4 py-8 text-center text-slate-500">Nenhuma subconta ainda.</td></tr>
+                          <tr>
+                            <td colSpan={8} className="px-6 py-16 text-center">
+                              <p className="text-sm font-medium text-slate-600">Nenhuma subconta ainda</p>
+                              <p className="mt-1 text-xs text-slate-500">Crie a primeira pela aba &quot;Nova Subconta&quot;.</p>
+                            </td>
+                          </tr>
                         ) : (
-                          subaccounts.map((s) => (
-                            <tr key={s.id} className="border-t border-slate-100">
-                              <td className="px-4 py-3">
-                                <div className="font-medium text-slate-900">{s.name || '-'}</div>
-                                <div className="text-xs text-slate-500">{s.email}</div>
-                              </td>
-                              <td className="px-4 py-3 font-mono text-brand-700">{s.apps?.code ?? '-'}</td>
-                              <td className="px-4 py-3">
-                                <span className={`rounded-md px-2 py-1 text-xs ${s.environment === 'production' ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-700'}`}>{s.environment}</span>
-                              </td>
-                              <td className="px-4 py-3 font-mono text-xs">
-                                <button type="button" className="text-brand-700 hover:underline" onClick={() => copyToClipboard(s.asaas_subaccount_id)}>{s.asaas_subaccount_id.slice(0, 8)}...</button>
-                              </td>
-                              <td className="px-4 py-3 font-mono text-xs max-w-[140px]">
-                                {s.asaas_wallet_id ? (
-                                  <button type="button" className="block truncate text-left text-brand-700 hover:underline" title={s.asaas_wallet_id} onClick={() => copyToClipboard(s.asaas_wallet_id!)}>
-                                    {s.asaas_wallet_id.slice(0, 10)}…
+                          subaccounts.map((s) => {
+                            const initials = (s.name || s.email || '?')
+                              .split(/\s+/)
+                              .map((w) => w[0])
+                              .join('')
+                              .slice(0, 2)
+                              .toUpperCase();
+                            return (
+                              <tr key={s.id} className="transition-colors hover:bg-brand-50/50">
+                                <td className="px-5 py-4 pl-6">
+                                  <div className="flex items-center gap-3">
+                                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-slate-100 to-slate-200 text-xs font-bold text-slate-600 ring-1 ring-slate-200/80">
+                                      {initials}
+                                    </span>
+                                    <div className="min-w-0">
+                                      <div className="truncate font-medium text-slate-900">{s.name || '—'}</div>
+                                      <div className="truncate text-xs text-slate-500">{s.email}</div>
+                                    </div>
+                                  </div>
+                                </td>
+                                <td className="px-4 py-4 font-mono text-xs font-semibold text-brand-700">{s.apps?.code ?? '—'}</td>
+                                <td className="px-4 py-4">
+                                  <span
+                                    className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+                                      s.environment === 'production'
+                                        ? 'bg-amber-100 text-amber-800 ring-1 ring-amber-200/80'
+                                        : 'bg-slate-100 text-slate-700 ring-1 ring-slate-200/80'
+                                    }`}
+                                  >
+                                    {s.environment}
+                                  </span>
+                                </td>
+                                <td className="px-4 py-4 font-mono text-xs">
+                                  <button
+                                    type="button"
+                                    className="rounded-lg border border-transparent px-1.5 py-0.5 text-brand-700 hover:border-brand-200 hover:bg-brand-50"
+                                    onClick={() => copyToClipboard(s.asaas_subaccount_id)}
+                                  >
+                                    {s.asaas_subaccount_id.slice(0, 8)}…
                                   </button>
-                                ) : (
-                                  <span className="text-slate-400">—</span>
-                                )}
-                              </td>
-                              <td className="px-4 py-3 font-mono text-xs">
-                                <button type="button" className="text-brand-700 hover:underline" onClick={() => copyToClipboard(s.api_key)}>{maskKey(s.api_key)}</button>
-                              </td>
-                              <td className="px-4 py-3 text-slate-700">{formatMoneyCents(s.monthly_fee_cents)}</td>
-                              <td className="px-4 py-3">
-                                <button
-                                  type="button"
-                                  className="text-xs text-red-700 hover:underline"
-                                  onClick={() => handleDeleteSubaccount(s.id, s.name || s.email)}
-                                >
-                                  Excluir
-                                </button>
-                              </td>
-                            </tr>
-                          ))
+                                </td>
+                                <td className="max-w-[140px] px-4 py-4 font-mono text-xs">
+                                  {s.asaas_wallet_id ? (
+                                    <button
+                                      type="button"
+                                      className="block w-full truncate rounded-lg border border-transparent text-left text-brand-700 hover:border-brand-200 hover:bg-brand-50"
+                                      title={s.asaas_wallet_id}
+                                      onClick={() => copyToClipboard(s.asaas_wallet_id!)}
+                                    >
+                                      {s.asaas_wallet_id.slice(0, 10)}…
+                                    </button>
+                                  ) : (
+                                    <span className="text-slate-400">—</span>
+                                  )}
+                                </td>
+                                <td className="px-4 py-4 font-mono text-xs">
+                                  <button
+                                    type="button"
+                                    className="rounded-lg border border-transparent px-1.5 py-0.5 text-brand-700 hover:border-brand-200 hover:bg-brand-50"
+                                    onClick={() => copyToClipboard(s.api_key)}
+                                  >
+                                    {maskKey(s.api_key)}
+                                  </button>
+                                </td>
+                                <td className="px-4 py-4 text-sm font-medium tabular-nums text-slate-800">{formatMoneyCents(s.monthly_fee_cents)}</td>
+                                <td className="px-5 py-4 pr-6 text-right">
+                                  <button
+                                    type="button"
+                                    className="inline-flex items-center rounded-lg border border-red-200 bg-red-50 px-2.5 py-1.5 text-xs font-semibold text-red-700 transition hover:bg-red-100"
+                                    onClick={() => handleDeleteSubaccount(s.id, s.name || s.email)}
+                                  >
+                                    Excluir
+                                  </button>
+                                </td>
+                              </tr>
+                            );
+                          })
                         )}
                       </tbody>
                     </table>
